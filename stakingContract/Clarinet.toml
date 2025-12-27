@@ -4,9 +4,12 @@ description = ''
 authors = []
 telemetry = true
 cache_dir = './.cache'
-requirements = []
-[contracts.stake]
-path = 'contracts/stake.clar'
+
+[[project.requirements]]
+contract_id = 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard'
+
+[contracts.staking-token]
+path = 'contracts/staking-token.clar'
 clarity_version = 4
 epoch = 'latest'
 
@@ -14,11 +17,8 @@ epoch = 'latest'
 path = 'contracts/staking.clar'
 clarity_version = 4
 epoch = 'latest'
+depends_on = ['staking-token']
 
-[contracts.staking-token]
-path = 'contracts/staking-token.clar'
-clarity_version = 4
-epoch = 'latest'
 [repl.analysis]
 passes = ['check_checker']
 
