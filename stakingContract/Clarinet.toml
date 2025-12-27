@@ -9,6 +9,16 @@ requirements = []
 path = 'contracts/stake.clar'
 clarity_version = 4
 epoch = 'latest'
+
+[contracts.staking]
+path = 'contracts/staking.clar'
+clarity_version = 4
+epoch = 'latest'
+
+[contracts.staking-token]
+path = 'contracts/staking-token.clar'
+clarity_version = 4
+epoch = 'latest'
 [repl.analysis]
 passes = ['check_checker']
 
