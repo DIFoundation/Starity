@@ -83,7 +83,6 @@
 )
 
 ;; Claim Rewards Function
-;; In staking-vault.clar
 (define-public (claim-rewards (token <ft-trait>))
     (let (
         (user tx-sender)
