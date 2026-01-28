@@ -82,6 +82,31 @@
     )
 )
 
+;; Claim Rewards Function
+(define-public (claim-rewards (token <ft-trait>))
+    (let (
+        (user tx-sender)
+        (earned (calculate-rewards user))
+        (data (unwrap! (map-get? UserInfo user) ERR-INSUFFICIENT-FUNDS))
+        (total-to-claim (+ (get pending-rewards data) earned))
+    )
+        ;; Check if there's actually anything to claim
+        (asserts! (> total-to-claim u0) (err u105))
+
+        ;; 1. The contract mints or transfers the rewards to the user
+        ;; Note: The contract must have enough STK balance or minting authority
+        (try! (as-contract (contract-call? token transfer total-to-claim tx-sender user none)))
+
+        ;; 2. Reset the user's pending rewards and update the timestamp
+        (map-set UserInfo user (merge data {
+            last-update: stacks-block-time,
+            pending-rewards: u0
+        }))
+
+        (ok total-to-claim)
+    )
+)
+
 ;; --- ADMIN FUNCTIONS ---
 (define-public (set-paused (status bool))
     (begin
