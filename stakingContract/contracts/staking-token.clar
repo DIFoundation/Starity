@@ -21,6 +21,8 @@
 (define-private (is-owner)
     (is-eq tx-sender CONTRACT-OWNER))
 
+(define-data-var authorized-minter principal tx-sender)
+
 ;; --- Public Functions ---
 
 ;; Minting: Now includes a check to ensure it aligns with your protocol goals
@@ -57,6 +59,21 @@
         ;; Print memo if it exists
         (match memo to-print (print to-print) 0x)
         (ok true)
+    )
+)
+
+(define-public (set-minter (new-minter principal))
+    (begin
+        (asserts! (is-eq tx-sender CONTRACT-OWNER) ERR-OWNER-ONLY)
+        (ok (var-set authorized-minter new-minter))
+    )
+)
+
+;; Restricted mint for the Staking Contract
+(define-public (mint-for-protocol (amount uint) (recipient principal))
+    (begin
+        (asserts! (is-eq tx-sender (var-get authorized-minter)) ERR-OWNER-ONLY)
+        (ft-mint? staking-token amount recipient)
     )
 )
 
