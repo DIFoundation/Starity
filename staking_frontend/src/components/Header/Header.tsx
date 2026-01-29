@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useConnect, useAccount, useAuthRequest } from '@stacks/connect-react';
-import { StacksTestnet } from '@stacks/network';
+import { STACKS_MAINNET } from '@stacks/network';
 import { Button, Box, Text, Flex, Avatar, Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
 import { FiLogOut, FiUser } from 'react-icons/fi';
 
