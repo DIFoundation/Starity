@@ -1,18 +1,16 @@
 import { useCallback } from 'react';
-import { StacksTestnet } from '@stacks/network';
-import { callReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
+import { STACKS_MAINNET } from '@stacks/network';
+import { fetchCallReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 
 // Update this with your Stacks network configuration
-const network = new StacksTestnet({
-  url: 'https://stacks-testnet.regtest.constantine2.blockscout.com',
-});
+const network = STACKS_MAINNET;
 
 export const useStakingContract = () => {
   // Helper function to call read-only functions
   const callReadOnly = useCallback(async (functionName: string, args: any[] = []) => {
     try {
-      const result = await callReadOnlyFunction({
+      const result = await fetchCallReadOnlyFunction({
         network,
         contractAddress: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[0],
         contractName: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[1],
