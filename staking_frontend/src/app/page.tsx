@@ -43,7 +43,7 @@ export default function StakingLandingPage() {
           </div>
           
           <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight leading-[1.1]">
-            Yield from the bedrock of <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-indigo-500">Bitcoin.</span>
+            Yield from the bedrock of <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-indigo-500">Bitcoin.</span>
           </h1>
           
           <p className="text-lg text-slate-400 max-w-md leading-relaxed">
@@ -63,7 +63,7 @@ export default function StakingLandingPage() {
         {/* --- Staking Card (Interactive Zone) --- */}
         <section className="relative">
           {/* Decorative background glow */}
-          <div className="absolute -inset-4 bg-gradient-to-tr from-indigo-500/20 to-orange-500/20 blur-3xl opacity-50 rounded-full"></div>
+          <div className="absolute -inset-4 bg-linear-to-tr from-indigo-500/20 to-orange-500/20 blur-3xl opacity-50 rounded-full"></div>
           
           <div className="relative bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden backdrop-blur-xl">
             <div className="flex border-b border-slate-800">
@@ -122,7 +122,7 @@ export default function StakingLandingPage() {
 
       {/* --- Footer / Feature Grid --- */}
       <footer className="max-w-7xl mx-auto px-8 mt-12 pb-20">
-        <div className="h-px bg-gradient-to-r from-transparent via-slate-800 to-transparent w-full mb-12"></div>
+        <div className="h-px bg-linear-to-r from-transparent via-slate-800 to-transparent w-full mb-12"></div>
         <div className="grid md:grid-cols-3 gap-12">
           <div>
             <h4 className="font-bold mb-3">Non-Custodial</h4>
