@@ -38,3 +38,14 @@ Starity/
     │ ├── components/ # Reusable components 
     │ └── hooks/ # Custom React hooks 
     └── public/ # Static assets
+
+## Frontend environment setup
+
+Before running the frontend, create a local env file in `staking_frontend` by copying the example and filling values:
+
+```bash
+cp staking_frontend/.env.local.example staking_frontend/.env.local
+# edit staking_frontend/.env.local and set NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS and NEXT_PUBLIC_STAKING_TOKEN_CONTRACT
+```
+
+For more details see `staking_frontend/README.md` and `staking_frontend/docs/env.md`.
