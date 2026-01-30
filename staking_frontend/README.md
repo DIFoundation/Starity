@@ -34,3 +34,21 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Environment variables
+
+Create a local copy of the example env file and update values before running the frontend:
+
+```bash
+cp .env.local.example .env.local
+# then edit .env.local and set NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS and NEXT_PUBLIC_STAKING_TOKEN_CONTRACT
+```
+
+Important variables:
+
+- `NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS` — Stacks contract principal (e.g. `SP... .contract-name`)
+- `NEXT_PUBLIC_STAKING_TOKEN_CONTRACT` — Token contract principal for the staking token
+- `NEXT_PUBLIC_STACKS_NETWORK` — `mainnet` or `testnet` (defaults to `mainnet`)
+- `NEXT_PUBLIC_DEFAULT_SENDER` — optional default sender principal used for read-only calls
+
+Files to update: `.env.local` in the `staking_frontend` folder. Do NOT commit `.env.local` to version control.
