@@ -59,3 +59,47 @@ Important variables:
 - `NEXT_PUBLIC_DEFAULT_SENDER` — optional default sender principal used for read-only calls
 
 Files to update: `.env.local` in the `staking_frontend` folder. Do NOT commit `.env.local` to version control.
+
+## Input Validation
+
+The application includes comprehensive input validation via the `src/utils/validation.ts` module. All staking operations (stake, unstake, claim rewards) are validated before transaction submission.
+
+### Quick Start with Validation
+
+```typescript
+import { validateStakeAmount, ValidationMessages } from '@/utils';
+
+// In your component
+const [error, setError] = useState('');
+
+const handleStake = () => {
+  const validation = validateStakeAmount(amount, undefined, userBalance);
+  
+  if (!validation.isValid) {
+    setError(validation.error || ValidationMessages.GENERAL_ERROR);
+    return;
+  }
+  
+  // Proceed with validated amount
+  const validAmount = validation.data;
+  // Submit transaction...
+};
+```
+
+### Validators Available
+
+- **Amount Validators**: `validateStakeAmount`, `validateUnstakeAmount`
+- **Address Validators**: `validateStacksAddress`, `validateContractIdentifier`, `validateTokenAddress`
+- **Composite Validators**: `validateStakingParams`, `validateUnstakingParams`, `validateClaimRewardsParams`
+- **Utilities**: `sanitizeInput`, `convertToSmallestUnit`, `convertFromSmallestUnit`
+
+### Features
+
+- ✅ Type-safe validation results
+- ✅ User-friendly error messages
+- ✅ Precision validation (6 decimal places for microSTX)
+- ✅ Balance checking
+- ✅ Address format validation
+- ✅ Amount range validation
+
+For detailed documentation, see [docs/validation.md](./docs/validation.md)
