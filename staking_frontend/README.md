@@ -44,6 +44,13 @@ cp .env.local.example .env.local
 # then edit .env.local and set NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS and NEXT_PUBLIC_STAKING_TOKEN_CONTRACT
 ```
 
+You can also run the included npm script to copy the example file:
+
+```bash
+npm run env:setup
+# or pnpm env:setup
+```
+
 Important variables:
 
 - `NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS` — Stacks contract principal (e.g. `SP... .contract-name`)
