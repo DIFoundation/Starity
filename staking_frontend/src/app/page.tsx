@@ -21,7 +21,7 @@ import {
 import { FiArrowUp, FiArrowDown, FiTrendingUp } from 'react-icons/fi';
 import { useStakingContract } from '@/hooks/useStakingContract';
 
-// Mock data for the UI - will be replaced with actual contract data
+// Commit 2: Stats cards display system
 const MOCK_STATS = [
   { label: 'Total Value Locked', value: '45.2M STX', change: '+12%', icon: FiArrowUp, color: 'green' },
   { label: 'Current APY', value: '9.2%', change: 'Stable', icon: FiTrendingUp, color: 'blue' },
