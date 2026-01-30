@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
-import { STACKS_MAINNET, STACKS_TESTNET } from '@stacks/network';
 import FRONTEND_ENV from '@/config/env';
+import { getStacksNetwork } from '@/config/networks';
 import { fetchCallReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 import {
@@ -11,8 +11,8 @@ import {
   ValidationMessages,
 } from '@/utils/validation';
 
-// Choose network via centralized env helper (mainnet | testnet)
-const network = (FRONTEND_ENV.STACKS_NETWORK === 'testnet') ? STACKS_TESTNET : STACKS_MAINNET;
+// Get network from centralized config with support for mainnet, testnet, devnet
+const network = getStacksNetwork(FRONTEND_ENV.STACKS_NETWORK);
 
 export const useStakingContract = () => {
   // Helper function to call read-only functions
