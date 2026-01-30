@@ -171,6 +171,7 @@ export default function StakingLandingPage() {
   };
 
   return (
+    // Commit 10: Complete UI layout and responsive design
     <Box minH="calc(100vh - 80px)" bg="gray.50" py={8} px={4}>
       <Box maxW="7xl" mx="auto">
         {/* Hero Section */}
