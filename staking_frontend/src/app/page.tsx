@@ -70,6 +70,7 @@ export default function StakingLandingPage() {
     getContractState,
   } = useStakingContract();
 
+  // Commit 7: Data fetching on component mount
   // Fetch user and contract data
   useEffect(() => {
     const fetchData = async () => {
