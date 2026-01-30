@@ -43,6 +43,7 @@ interface ContractStateInfo {
 }
 
 export default function StakingLandingPage() {
+  // Commit 4: Form and loading state management
   const [amount, setAmount] = useState('');
   const [unstakeAmount, setUnstakeAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
