@@ -28,6 +28,7 @@ const MOCK_STATS = [
   { label: 'Active Stakers', value: '12,840', change: '+142 today', icon: FiArrowUp, color: 'purple' },
 ];
 
+// Commit 3: User staking data types and contracts
 interface UserStakingInfo {
   stakedAmount: number;
   pendingRewards: number;
