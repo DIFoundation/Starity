@@ -65,6 +65,7 @@ export default function StakingLandingPage() {
   });
   
   const { 
+    // Commit 6: Contract hook integration
     getUserInfo, 
     getContractState,
   } = useStakingContract();
