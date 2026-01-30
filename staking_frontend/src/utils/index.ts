@@ -2,6 +2,9 @@
 export {
   // Validation types and constants
   type ValidationResult,
+  type ValidatedStakeAmount,
+  type ValidatedUnstakeAmount,
+  type BlockchainAmount,
   ValidationMessages,
 
   // Amount validators

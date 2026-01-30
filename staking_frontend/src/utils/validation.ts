@@ -8,6 +8,39 @@ export interface ValidationResult<T = void> {
   data?: T;
 }
 
+// Branded types for type-safe validated amounts (TypeScript nominal typing)
+// This ensures you can't accidentally mix validated and unvalidated amounts
+/** Amount that has passed stake validation */
+export type ValidatedStakeAmount = number & { readonly __validatedStake: true };
+/** Amount that has passed unstake validation */
+export type ValidatedUnstakeAmount = number & { readonly __validatedUnstake: true };
+/** Amount in smallest units (microSTX) ready for blockchain */
+export type BlockchainAmount = string & { readonly __blockchainAmount: true };
+
+/**
+ * Creates a type-safe validated amount (for stake operations)
+ * @internal Use after validateStakeAmount() validation
+ */
+function createValidatedStakeAmount(amount: number): ValidatedStakeAmount {
+  return amount as ValidatedStakeAmount;
+}
+
+/**
+ * Creates a type-safe validated amount (for unstake operations)
+ * @internal Use after validateUnstakeAmount() validation
+ */
+function createValidatedUnstakeAmount(amount: number): ValidatedUnstakeAmount {
+  return amount as ValidatedUnstakeAmount;
+}
+
+/**
+ * Creates a type-safe blockchain amount string
+ * @internal Use after convertToSmallestUnit() conversion
+ */
+function createBlockchainAmount(amount: string): BlockchainAmount {
+  return amount as BlockchainAmount;
+}
+
 // Validation Error Messages
 export const ValidationMessages = {
   AMOUNT_REQUIRED: 'Amount is required',
@@ -59,7 +92,7 @@ export function validateStakeAmount(
   amount: string | number,
   maxAmount?: number,
   userBalance?: number
-): ValidationResult<number> {
+): ValidationResult<ValidatedStakeAmount> {
   // Check if amount is provided
   if (amount === null || amount === undefined || amount === '') {
     return { isValid: false, error: ValidationMessages.AMOUNT_REQUIRED };
@@ -104,7 +137,7 @@ export function validateStakeAmount(
     return { isValid: false, error: ValidationMessages.AMOUNT_INSUFFICIENT_BALANCE };
   }
 
-  return { isValid: true, data: numAmount };
+  return { isValid: true, data: createValidatedStakeAmount(numAmount) };
 }
 
 /**
@@ -126,7 +159,7 @@ export function validateStakeAmount(
 export function validateUnstakeAmount(
   amount: string | number,
   stakedAmount: number
-): ValidationResult<number> {
+): ValidationResult<ValidatedUnstakeAmount> {
   // First validate basic amount
   const basicValidation = validateStakeAmount(amount);
   if (!basicValidation.isValid) {
@@ -138,7 +171,11 @@ export function validateUnstakeAmount(
     return { isValid: false, error: ValidationMessages.AMOUNT_INSUFFICIENT_BALANCE };
   }
 
-  return basicValidation;
+  // Cast to unstake type
+  return {
+    isValid: true,
+    data: createValidatedUnstakeAmount(basicValidation.data ?? 0),
+  };
 }
 
 /**
@@ -318,10 +355,10 @@ export function sanitizeInput(input: string): string {
  * const blockchainAmount = convertToSmallestUnit(validAmount);
  * // blockchainAmount can now be used in uintCV() for Clarity
  */
-export function convertToSmallestUnit(amount: number): string {
+export function convertToSmallestUnit(amount: number): BlockchainAmount {
   const factor = 1_000_000; // 6 decimal places
   const smallestUnit = Math.floor(amount * factor);
-  return smallestUnit.toString();
+  return createBlockchainAmount(smallestUnit.toString());
 }
 
 /**
