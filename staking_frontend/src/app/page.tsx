@@ -129,6 +129,7 @@ export default function StakingLandingPage() {
   };
 
   const handleUnstake = async () => {
+    // Commit 9: Unstake and claim rewards handlers
     if (!unstakeAmount || isNaN(Number(unstakeAmount)) || Number(unstakeAmount) <= 0) {
       alert('Please enter a valid amount');
       return;
