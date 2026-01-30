@@ -3,6 +3,13 @@ import { STACKS_MAINNET, STACKS_TESTNET } from '@stacks/network';
 import FRONTEND_ENV from '@/config/env';
 import { fetchCallReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
+import {
+  validateStakingParams,
+  validateUnstakingParams,
+  validateClaimRewardsParams,
+  convertToSmallestUnit,
+  ValidationMessages,
+} from '@/utils/validation';
 
 // Choose network via centralized env helper (mainnet | testnet)
 const network = (FRONTEND_ENV.STACKS_NETWORK === 'testnet') ? STACKS_TESTNET : STACKS_MAINNET;
@@ -43,10 +50,12 @@ export const useStakingContract = () => {
     };
   }, [callReadOnly]);
 
-  // Prepare transaction for write functions
+  // Prepare transaction for write functions (with validation)
   const prepareTransaction = useCallback((functionName: string, params: StakingFunctionParams) => {
     const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
     const [baseContractAddress, baseContractName] = contractIdentifier.split('.');
+    const tokenAddress = params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT;
+    
     const baseOptions = {
       contractAddress: baseContractAddress,
       contractName: baseContractName,
@@ -55,24 +64,56 @@ export const useStakingContract = () => {
     };
 
     switch (functionName) {
-      case STAKING_CONTRACT.FUNCTIONS.STAKE:
-      case STAKING_CONTRACT.FUNCTIONS.UNSTAKE: {
-        const tokenPrincipal = params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT;
+      case STAKING_CONTRACT.FUNCTIONS.STAKE: {
+        // Validate stake parameters
+        const validation = validateStakingParams(params.amount ?? 0, tokenAddress);
+        if (!validation.isValid) {
+          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
+        }
+        
+        const amount = convertToSmallestUnit(validation.data ?? 0);
         return {
           ...baseOptions,
           functionArgs: [
-            standardPrincipalCV(tokenPrincipal!), // Token contract address
-            uintCV(params.amount!), // Amount to stake/unstake
+            standardPrincipalCV(tokenAddress!), // Token contract address
+            uintCV(amount), // Amount to stake (in smallest units)
           ],
         };
       }
-      case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS:
+      case STAKING_CONTRACT.FUNCTIONS.UNSTAKE: {
+        // Validate unstake parameters
+        const validation = validateUnstakingParams(
+          params.amount ?? 0,
+          tokenAddress,
+          params.stakedAmount ?? 0
+        );
+        if (!validation.isValid) {
+          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
+        }
+        
+        const amount = convertToSmallestUnit(validation.data ?? 0);
         return {
           ...baseOptions,
           functionArgs: [
-            standardPrincipalCV(params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT!), // Token contract address
+            standardPrincipalCV(tokenAddress!), // Token contract address
+            uintCV(amount), // Amount to unstake (in smallest units)
           ],
         };
+      }
+      case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS: {
+        // Validate claim rewards parameters
+        const validation = validateClaimRewardsParams(tokenAddress, params.pendingRewards ?? 0);
+        if (!validation.isValid) {
+          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
+        }
+        
+        return {
+          ...baseOptions,
+          functionArgs: [
+            standardPrincipalCV(tokenAddress!), // Token contract address
+          ],
+        };
+      }
       case STAKING_CONTRACT.FUNCTIONS.SET_PAUSED:
         return {
           ...baseOptions,
