@@ -40,6 +40,20 @@ const DECIMAL_PLACES_MAX = 6;
  * @param maxAmount - Maximum allowed amount (optional)
  * @param userBalance - User's current balance (optional)
  * @returns ValidationResult with amount converted to safe integer
+ * 
+ * @example
+ * // Basic validation
+ * const result = validateStakeAmount('100.5');
+ * if (result.isValid) {
+ *   const validAmount = result.data; // 100.5
+ * }
+ * 
+ * @example
+ * // With balance check
+ * const result = validateStakeAmount('100.5', undefined, userBalance);
+ * if (!result.isValid) {
+ *   showError(result.error); // "Insufficient balance for this amount"
+ * }
  */
 export function validateStakeAmount(
   amount: string | number,
@@ -98,6 +112,16 @@ export function validateStakeAmount(
  * @param amount - The amount to unstake
  * @param stakedAmount - User's current staked amount
  * @returns ValidationResult
+ * 
+ * @example
+ * // Validate unstake with staked amount check
+ * const result = validateUnstakeAmount('50', userInfo.stakedAmount);
+ * if (result.isValid) {
+ *   const validAmount = result.data; // 50
+ *   // Safe to unstake
+ * } else {
+ *   console.log(result.error); // "Insufficient balance for this amount"
+ * }
  */
 export function validateUnstakeAmount(
   amount: string | number,
@@ -178,6 +202,20 @@ export function validateTokenAddress(tokenAddress: string | undefined): Validati
  * @param tokenAddress - Token contract address
  * @param userBalance - User's available balance
  * @returns ValidationResult
+ * 
+ * @example
+ * // Validate all staking parameters at once
+ * const result = validateStakingParams(stakeAmount, tokenAddress, userBalance);
+ * if (result.isValid) {
+ *   // All parameters are valid, safe to proceed
+ *   const txOptions = prepareTransaction(FUNCTIONS.STAKE, {
+ *     amount: stakeAmount,
+ *     token: tokenAddress,
+ *   });
+ * } else {
+ *   // Show user-friendly error message
+ *   setError(result.error);
+ * }
  */
 export function validateStakingParams(
   amount: string | number,
@@ -267,6 +305,18 @@ export function sanitizeInput(input: string): string {
  * Assumes 6 decimal places (1 token = 1,000,000 smallest units)
  * @param amount - Amount in tokens
  * @returns Amount in smallest units as string (for Clarity uint128)
+ * 
+ * @example
+ * // Convert tokens to microSTX for blockchain submission
+ * const tokens = 100.5;
+ * const microStx = convertToSmallestUnit(tokens);
+ * // Returns: '100500000'
+ * 
+ * @example
+ * // Use in transaction submission
+ * const validAmount = validateStakeAmount('100.5').data;
+ * const blockchainAmount = convertToSmallestUnit(validAmount);
+ * // blockchainAmount can now be used in uintCV() for Clarity
  */
 export function convertToSmallestUnit(amount: number): string {
   const factor = 1_000_000; // 6 decimal places
@@ -278,6 +328,17 @@ export function convertToSmallestUnit(amount: number): string {
  * Converts smallest unit back to tokens
  * @param smallestUnit - Amount in smallest units
  * @returns Amount in tokens as number
+ * 
+ * @example
+ * // Convert blockchain value to display format
+ * const microStx = '100500000';
+ * const tokens = convertFromSmallestUnit(microStx);
+ * // Returns: 100.5
+ * 
+ * @example
+ * // Display user's staked amount
+ * const stakedAmount = convertFromSmallestUnit(userContractData.staked);
+ * displayText(`Staked: ${stakedAmount} STX`);
  */
 export function convertFromSmallestUnit(smallestUnit: number | string): number {
   const factor = 1_000_000;
