@@ -1,22 +1,26 @@
 import { useCallback } from 'react';
-import { STACKS_MAINNET } from '@stacks/network';
+import { STACKS_MAINNET, STACKS_TESTNET } from '@stacks/network';
+import FRONTEND_ENV from '@/config/env';
 import { fetchCallReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 
-// Update this with your Stacks network configuration
-const network = STACKS_MAINNET;
+// Choose network via centralized env helper (mainnet | testnet)
+const network = (FRONTEND_ENV.STACKS_NETWORK === 'testnet') ? STACKS_TESTNET : STACKS_MAINNET;
 
 export const useStakingContract = () => {
   // Helper function to call read-only functions
   const callReadOnly = useCallback(async (functionName: string, args: any[] = []) => {
     try {
+      const senderAddress = FRONTEND_ENV.DEFAULT_SENDER || 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
+      const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
+      const [contractAddress, contractName] = contractIdentifier.split('.');
       const result = await fetchCallReadOnlyFunction({
         network,
-        contractAddress: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[0],
-        contractName: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[1],
+        contractAddress,
+        contractName,
         functionName,
         functionArgs: args,
-        senderAddress: 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE', // Default sender, can be overridden
+        senderAddress, // Default sender, can be overridden
       });
       return cvToValue(result);
     } catch (error) {
@@ -41,28 +45,32 @@ export const useStakingContract = () => {
 
   // Prepare transaction for write functions
   const prepareTransaction = useCallback((functionName: string, params: StakingFunctionParams) => {
+    const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
+    const [baseContractAddress, baseContractName] = contractIdentifier.split('.');
     const baseOptions = {
-      contractAddress: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[0],
-      contractName: STAKING_CONTRACT.CONTRACT_ADDRESS.split('.')[1],
+      contractAddress: baseContractAddress,
+      contractName: baseContractName,
       functionName,
       network,
     };
 
     switch (functionName) {
       case STAKING_CONTRACT.FUNCTIONS.STAKE:
-      case STAKING_CONTRACT.FUNCTIONS.UNSTAKE:
+      case STAKING_CONTRACT.FUNCTIONS.UNSTAKE: {
+        const tokenPrincipal = params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT;
         return {
           ...baseOptions,
           functionArgs: [
-            standardPrincipalCV(params.token!), // Token contract address
+            standardPrincipalCV(tokenPrincipal!), // Token contract address
             uintCV(params.amount!), // Amount to stake/unstake
           ],
         };
+      }
       case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS:
         return {
           ...baseOptions,
           functionArgs: [
-            standardPrincipalCV(params.token!), // Token contract address
+            standardPrincipalCV(params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT!), // Token contract address
           ],
         };
       case STAKING_CONTRACT.FUNCTIONS.SET_PAUSED:
@@ -110,10 +118,10 @@ function StakingComponent() {
     console.log('User staking info:', userData);
   };
   
-  // Example: Prepare a stake transaction
+  // Example: Prepare a stake transaction (uses env default token if not provided)
   const handleStake = async () => {
     const txOptions = prepareTransaction(FUNCTIONS.STAKE, {
-      token: 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.your-token-contract',
+      // `token` can be omitted to use NEXT_PUBLIC_STAKING_TOKEN_CONTRACT from env
       amount: 1000000, // Amount in the smallest unit
     });
     

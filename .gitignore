@@ -1,0 +1,6 @@
+# Root gitignore for repository
+# Ignore frontend local env
+staking_frontend/.env.local
+
+# Node modules (repo-level)
+/node_modules

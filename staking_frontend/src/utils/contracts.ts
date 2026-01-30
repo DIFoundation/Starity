@@ -1,7 +1,13 @@
 // Staking Contract ABI and Types
+import FRONTEND_ENV from '@/config/env';
+
+// Read contract address from centralized env helper (NEXT_PUBLIC_...)
+const CONTRACT_ADDRESS = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS ||
+  'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.your-contract-name';
+
 export const STAKING_CONTRACT = {
-  // Contract identifier (update this with your actual contract address and name)
-  CONTRACT_ADDRESS: 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.your-contract-name',
+  // Contract identifier (can be provided via environment)
+  CONTRACT_ADDRESS: CONTRACT_ADDRESS,
   
   // Function names
   FUNCTIONS: {
@@ -32,6 +38,12 @@ export const STAKING_CONTRACT = {
     }
   }
 } as const;
+
+// Utility to split a contract identifier into address + name
+export function getContractParts(identifier = STAKING_CONTRACT.CONTRACT_ADDRESS) {
+  const [address, name] = identifier.split('.');
+  return { address, name };
+}
 
 // Type definitions for better TypeScript support
 export type StakingFunction = keyof typeof STAKING_CONTRACT.FUNCTIONS;
