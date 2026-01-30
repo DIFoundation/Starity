@@ -39,6 +39,12 @@ export const STAKING_CONTRACT = {
   }
 } as const;
 
+// Utility to split a contract identifier into address + name
+export function getContractParts(identifier = STAKING_CONTRACT.CONTRACT_ADDRESS) {
+  const [address, name] = identifier.split('.');
+  return { address, name };
+}
+
 // Type definitions for better TypeScript support
 export type StakingFunction = keyof typeof STAKING_CONTRACT.FUNCTIONS;
 
