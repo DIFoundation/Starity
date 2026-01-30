@@ -118,10 +118,10 @@ function StakingComponent() {
     console.log('User staking info:', userData);
   };
   
-  // Example: Prepare a stake transaction
+  // Example: Prepare a stake transaction (uses env default token if not provided)
   const handleStake = async () => {
     const txOptions = prepareTransaction(FUNCTIONS.STAKE, {
-      token: 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.your-token-contract',
+      // `token` can be omitted to use NEXT_PUBLIC_STAKING_TOKEN_CONTRACT from env
       amount: 1000000, // Amount in the smallest unit
     });
     
