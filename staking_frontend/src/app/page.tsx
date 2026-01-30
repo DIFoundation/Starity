@@ -20,6 +20,12 @@ import {
 } from '@chakra-ui/react';
 import { FiArrowUp, FiArrowDown, FiTrendingUp } from 'react-icons/fi';
 import { useStakingContract } from '@/hooks/useStakingContract';
+import {
+  validateStakeAmount,
+  validateUnstakeAmount,
+  validateClaimRewardsParams,
+  ValidationMessages,
+} from '@/utils/validation';
 
 // Commit 2: Stats cards display system
 const MOCK_STATS = [
@@ -48,6 +54,9 @@ export default function StakingLandingPage() {
   const [unstakeAmount, setUnstakeAmount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
+  const [stakeError, setStakeError] = useState('');
+  const [unstakeError, setUnstakeError] = useState('');
+  const [claimError, setClaimError] = useState('');
   
   // Commit 5: User and contract data state initialization
   // User and contract state
@@ -110,51 +119,61 @@ export default function StakingLandingPage() {
   }, [getUserInfo, getContractState]);
 
   const handleStake = async () => {
-    // Commit 8: Stake operation handler
-    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
-      alert('Please enter a valid amount');
+    // Clear previous errors
+    setStakeError('');
+    
+    // Validate using comprehensive validation utility
+    const validation = validateStakeAmount(amount, undefined, userInfo.stakedAmount + 1000);
+    if (!validation.isValid) {
+      setStakeError(validation.error || ValidationMessages.GENERAL_ERROR);
       return;
     }
 
     try {
       setIsLoading(true);
-      // Actual contract call would go here
-      console.log('Staking:', amount);
+      // Actual contract call would go here with validated amount
+      console.log('Staking:', validation.data);
       setAmount('');
     } catch (error) {
       console.error('Staking failed:', error);
+      setStakeError(error instanceof Error ? error.message : 'Staking failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleUnstake = async () => {
-    // Commit 9: Unstake and claim rewards handlers
-    if (!unstakeAmount || isNaN(Number(unstakeAmount)) || Number(unstakeAmount) <= 0) {
-      alert('Please enter a valid amount');
-      return;
-    }
-
-    if (Number(unstakeAmount) > userInfo.stakedAmount) {
-      alert('Insufficient stake');
+    // Clear previous errors
+    setUnstakeError('');
+    
+    // Validate using comprehensive validation utility
+    const validation = validateUnstakeAmount(unstakeAmount, userInfo.stakedAmount);
+    if (!validation.isValid) {
+      setUnstakeError(validation.error || ValidationMessages.GENERAL_ERROR);
       return;
     }
 
     try {
       setIsLoading(true);
-      // Actual contract call would go here
-      console.log('Unstaking:', unstakeAmount);
+      // Actual contract call would go here with validated amount
+      console.log('Unstaking:', validation.data);
       setUnstakeAmount('');
     } catch (error) {
       console.error('Unstaking failed:', error);
+      setUnstakeError(error instanceof Error ? error.message : 'Unstaking failed');
     } finally {
       setIsLoading(false);
     }
   };
 
   const handleClaimRewards = async () => {
-    if (userInfo.pendingRewards <= 0) {
-      alert('No rewards to claim');
+    // Clear previous errors
+    setClaimError('');
+    
+    // Validate using comprehensive validation utility
+    const validation = validateClaimRewardsParams(undefined, userInfo.pendingRewards);
+    if (!validation.isValid) {
+      setClaimError(validation.error || ValidationMessages.GENERAL_ERROR);
       return;
     }
 
@@ -165,6 +184,7 @@ export default function StakingLandingPage() {
       setUserInfo(prev => ({ ...prev, pendingRewards: 0 }));
     } catch (error) {
       console.error('Claim failed:', error);
+      setClaimError(error instanceof Error ? error.message : 'Claim failed');
     } finally {
       setIsLoading(false);
     }
@@ -270,6 +290,12 @@ export default function StakingLandingPage() {
                     </HStack>
                   </Stack>
                   
+                  {stakeError && (
+                    <Box bg="red.50" borderRadius="md" p={3} borderLeft="4px" borderColor="red.400">
+                      <Text fontSize="sm" color="red.700">{stakeError}</Text>
+                    </Box>
+                  )}
+                  
                   <Button
                     colorScheme="purple"
                     size="lg"
@@ -323,6 +349,12 @@ export default function StakingLandingPage() {
                       </Button>
                     </HStack>
                   </Stack>
+                  
+                  {unstakeError && (
+                    <Box bg="red.50" borderRadius="md" p={3} borderLeft="4px" borderColor="red.400">
+                      <Text fontSize="sm" color="red.700">{unstakeError}</Text>
+                    </Box>
+                  )}
                   
                   <Button
                     colorScheme="red"
@@ -389,6 +421,12 @@ export default function StakingLandingPage() {
                           </Text>
                         </HStack>
                       </Stack>
+
+                      {claimError && (
+                        <Box bg="red.50" borderRadius="md" p={3} borderLeft="4px" borderColor="red.400">
+                          <Text fontSize="sm" color="red.700">{claimError}</Text>
+                        </Box>
+                      )}
 
                       <Button
                         colorScheme="green"
