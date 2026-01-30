@@ -1,7 +1,11 @@
-'use client'
-import React, { useState } from 'react';
+'use client';
 
-// Mock data for the UI - eventually replaced by Clarity read-only calls
+import { useState, useEffect } from 'react';
+import { useAccount } from '@stacks/connect-react';
+import { Box, Button, Input, VStack, HStack, Text, Card, CardBody, Divider, useToast } from '@chakra-ui/react';
+import { useStakingContract } from '@/hooks/useStakingContract';
+
+// Mock data for the UI - will be replaced with actual contract data
 const MOCK_STATS = [
   { label: 'Total Value Locked', value: '45.2M STX', change: '+12%' },
   { label: 'Current APY', value: '9.2%', change: 'Stable' },
@@ -10,134 +14,189 @@ const MOCK_STATS = [
 
 export default function StakingLandingPage() {
   const [amount, setAmount] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const { address } = useAccount();
+  const toast = useToast();
+  
+  const { 
+    getUserInfo, 
+    getContractState,
+    prepareTransaction,
+    FUNCTIONS 
+  } = useStakingContract();
+
+  // Fetch user and contract data
+  useEffect(() => {
+    const fetchData = async () => {
+      if (!address) return;
+      
+      try {
+        setIsLoading(true);
+        const [userInfo, contractState] = await Promise.all([
+          getUserInfo(address),
+          getContractState()
+        ]);
+        console.log('User Info:', userInfo);
+        console.log('Contract State:', contractState);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch staking data',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [address, getUserInfo, getContractState, toast]);
+
+  const handleStake = async () => {
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
+      toast({
+        title: 'Invalid Amount',
+        description: 'Please enter a valid amount to stake',
+        status: 'warning',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      // This would be replaced with actual contract call
+      // const txOptions = prepareTransaction(FUNCTIONS.STAKE, {
+      //   token: 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.your-token-contract',
+      //   amount: Number(amount) * 1e6, // Convert to smallest unit
+      // });
+      // await doContractCall(txOptions);
+      
+      toast({
+        title: 'Success',
+        description: 'Tokens staked successfully!',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      
+      setAmount('');
+    } catch (error) {
+      console.error('Staking failed:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to stake tokens',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
-    <div className="min-h-screen bg-[#020617] text-white selection:bg-indigo-500/30">
-      
-      {/* --- Navigation --- */}
-      <nav className="flex justify-between items-center px-8 py-6 max-w-7xl mx-auto">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg rotate-12"></div>
-          <span className="text-xl font-bold tracking-tight">StacksYield</span>
-        </div>
-        <div className="hidden md:flex gap-8 text-sm text-slate-400 font-medium">
-          <a href="#" className="hover:text-white transition">Dashboard</a>
-          <a href="#" className="hover:text-white transition">Governance</a>
-          <a href="#" className="hover:text-white transition">Docs</a>
-        </div>
-        <button className="bg-white text-black px-5 py-2.5 rounded-full text-sm font-bold hover:bg-slate-200 transition shadow-lg">
-          Connect Wallet
-        </button>
-      </nav>
+    <Box minH="calc(100vh - 80px)" bg="gray.50" py={8} px={4}>
+      <Box maxW="6xl" mx="auto">
+        {/* Stats Cards */}
+        <HStack spacing={6} mb={8} flexWrap="wrap" justify="center">
+          {MOCK_STATS.map((stat, index) => (
+            <Card key={index} flex={1} minW="200px" bg="white" borderRadius="lg" boxShadow="sm">
+              <CardBody>
+                <Text fontSize="sm" color="gray.500" mb={2}>
+                  {stat.label}
+                </Text>
+                <Text fontSize="2xl" fontWeight="bold" mb={1}>
+                  {stat.value}
+                </Text>
+                <Text 
+                  fontSize="xs" 
+                  color={stat.change === 'Stable' ? 'gray.500' : 'green.500'}
+                  fontWeight="medium"
+                >
+                  {stat.change}
+                </Text>
+              </CardBody>
+            </Card>
+          ))}
+        </HStack>
 
-      <main className="max-w-7xl mx-auto px-8 py-12 grid lg:grid-cols-2 gap-16 items-center">
-        
-        {/* --- Hero Section --- */}
-        <section className="space-y-8">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-bold uppercase tracking-widest">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-indigo-500"></span>
-            </span>
-            Live on Mainnet
-          </div>
-          
-          <h1 className="text-6xl md:text-7xl font-extrabold tracking-tight leading-[1.1]">
-            Yield from the bedrock of <span className="text-transparent bg-clip-text bg-linear-to-r from-orange-400 to-indigo-500">Bitcoin.</span>
-          </h1>
-          
-          <p className="text-lg text-slate-400 max-w-md leading-relaxed">
-            Stake your STX to secure the network and earn rewards. Powered by Clarity smart contracts for 100% transparency.
-          </p>
-
-          <div className="grid grid-cols-3 gap-4 pt-4">
-            {MOCK_STATS.map((stat) => (
-              <div key={stat.label}>
-                <p className="text-2xl font-bold">{stat.value}</p>
-                <p className="text-xs text-slate-500 uppercase font-semibold">{stat.label}</p>
-              </div>
-            ))}
-          </div>
-        </section>
-
-        {/* --- Staking Card (Interactive Zone) --- */}
-        <section className="relative">
-          {/* Decorative background glow */}
-          <div className="absolute -inset-4 bg-linear-to-tr from-indigo-500/20 to-orange-500/20 blur-3xl opacity-50 rounded-full"></div>
-          
-          <div className="relative bg-slate-900 border border-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden backdrop-blur-xl">
-            <div className="flex border-b border-slate-800">
-              <button className="flex-1 py-5 text-sm font-bold border-b-2 border-indigo-500 bg-slate-800/30">Stake</button>
-              <button className="flex-1 py-5 text-sm font-bold text-slate-500 hover:text-white transition">Unstake</button>
-            </div>
-
-            <div className="p-8 space-y-8">
-              <div className="flex justify-between items-end">
-                <div>
-                  <label className="text-xs text-slate-500 uppercase font-bold tracking-widest">Amount to Stake</label>
-                  <div className="flex items-center gap-2 mt-2">
-                    <input 
-                      type="number" 
-                      value={amount}
-                      onChange={(e) => setAmount(e.target.value)}
-                      placeholder="0.00" 
-                      className="bg-transparent text-4xl font-bold focus:outline-none w-full placeholder:text-slate-800"
-                    />
-                    <span className="text-xl font-bold text-slate-600">STX</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-4 gap-2">
-                {['25%', '50%', '75%', 'MAX'].map((pc) => (
-                  <button key={pc} className="py-2 rounded-xl border border-slate-800 text-xs font-bold hover:bg-slate-800 transition text-slate-400 hover:text-white">
-                    {pc}
-                  </button>
-                ))}
-              </div>
-
-              <div className="space-y-4 p-5 bg-black/40 rounded-3xl border border-slate-800/50">
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Est. Monthly Rewards</span>
-                  <span className="text-green-400 font-bold">~14.5 STX</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-slate-500 font-medium">Unlock Period</span>
-                  <span className="text-slate-300">2,100 Blocks</span>
-                </div>
-              </div>
-
-              <button className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-5 rounded-2xl shadow-xl shadow-indigo-500/20 transition-all active:scale-[0.98]">
-                Stake Now
-              </button>
-
-              <div className="flex items-center justify-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-[0.2em]">
-                <img src="/btc-icon.svg" className="w-3 h-3 grayscale opacity-50" alt="" />
-                Secured by Bitcoin Finality
-              </div>
-            </div>
-          </div>
-        </section>
-      </main>
-
-      {/* --- Footer / Feature Grid --- */}
-      <footer className="max-w-7xl mx-auto px-8 mt-12 pb-20">
-        <div className="h-px bg-linear-to-r from-transparent via-slate-800 to-transparent w-full mb-12"></div>
-        <div className="grid md:grid-cols-3 gap-12">
-          <div>
-            <h4 className="font-bold mb-3">Non-Custodial</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">Your funds are controlled by the Clarity smart contract, not our team. You retain ownership at all times.</p>
-          </div>
-          <div>
-            <h4 className="font-bold mb-3">Clarity Secure</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">No re-entrancy attacks. Our contract code is public, interpreted, and anchored to Bitcoin.</p>
-          </div>
-          <div>
-            <h4 className="font-bold mb-3">Stacking Yield</h4>
-            <p className="text-sm text-slate-500 leading-relaxed">By participating in this pool, you help secure the Stacks layer and earn a share of protocol rewards.</p>
-          </div>
-        </div>
-      </footer>
-    </div>
+        {/* Staking Form */}
+        <Card bg="white" borderRadius="lg" boxShadow="sm" maxW="md" mx="auto">
+          <CardBody p={6}>
+            <VStack spacing={6}>
+              <Text fontSize="xl" fontWeight="bold">
+                Stake Your Tokens
+              </Text>
+              
+              <VStack w="full" spacing={4}>
+                <Input
+                  placeholder="0.00"
+                  size="lg"
+                  textAlign="right"
+                  fontSize="2xl"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  borderColor="gray.200"
+                  _hover={{ borderColor: 'gray.300' }}
+                  _focus={{
+                    borderColor: 'purple.400',
+                    boxShadow: '0 0 0 1px var(--chakra-colors-purple-400)',
+                  }}
+                />
+                
+                <HStack w="full" justify="space-between" color="gray.500" fontSize="sm">
+                  <Text>Balance: 0 STX</Text>
+                  <Button 
+                    variant="link" 
+                    size="sm" 
+                    colorScheme="purple"
+                    onClick={() => setAmount('100')}
+                  >
+                    Max
+                  </Button>
+                </HStack>
+              </VStack>
+              
+              <Divider />
+              
+              <VStack w="full" spacing={3}>
+                <HStack w="full" justify="space-between">
+                  <Text>APY</Text>
+                  <Text fontWeight="medium">9.2%</Text>
+                </HStack>
+                <HStack w="full" justify="space-between">
+                  <Text>Your Stake</Text>
+                  <Text fontWeight="medium">0 STX</Text>
+                </HStack>
+                <HStack w="full" justify="space-between">
+                  <Text>Rewards</Text>
+                  <Text fontWeight="medium" color="green.500">0 STX</Text>
+                </HStack>
+              </VStack>
+              
+              <Button
+                colorScheme="purple"
+                size="lg"
+                w="full"
+                onClick={handleStake}
+                isLoading={isLoading}
+                loadingText="Processing..."
+                isDisabled={!amount || isNaN(Number(amount)) || Number(amount) <= 0}
+              >
+                Stake Tokens
+              </Button>
+            </VStack>
+          </CardBody>
+        </Card>
+      </Box>
+    </Box>
   );
 }
