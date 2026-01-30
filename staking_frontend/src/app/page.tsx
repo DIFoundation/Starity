@@ -110,6 +110,7 @@ export default function StakingLandingPage() {
   }, [getUserInfo, getContractState]);
 
   const handleStake = async () => {
+    // Commit 8: Stake operation handler
     if (!amount || isNaN(Number(amount)) || Number(amount) <= 0) {
       alert('Please enter a valid amount');
       return;
