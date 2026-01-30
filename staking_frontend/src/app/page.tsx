@@ -49,6 +49,7 @@ export default function StakingLandingPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
   
+  // Commit 5: User and contract data state initialization
   // User and contract state
   const [userInfo, setUserInfo] = useState<UserStakingInfo>({
     stakedAmount: 0,
