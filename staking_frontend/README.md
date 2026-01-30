@@ -103,3 +103,87 @@ const handleStake = () => {
 - ✅ Amount range validation
 
 For detailed documentation, see [docs/validation.md](./docs/validation.md)
+
+## Network Configuration
+
+The staking frontend supports multiple Stacks networks: **Mainnet**, **Testnet**, and **Devnet** (local development).
+
+### Quick Network Setup
+
+```bash
+# Development (Devnet)
+NEXT_PUBLIC_STACKS_NETWORK=devnet npm run dev
+
+# Testnet
+NEXT_PUBLIC_STACKS_NETWORK=testnet npm run dev
+
+# Mainnet (production)
+NEXT_PUBLIC_STACKS_NETWORK=mainnet npm run build
+```
+
+### Supported Networks
+
+| Network | RPC Endpoint | Use Case | Status |
+|---------|---|---|---|
+| **Mainnet** | https://api.mainnet.hiro.so | Production (Real STX) | 🟢 Ready |
+| **Testnet** | https://api.testnet.hiro.so | Testing & Development | 🟡 Testing |
+| **Devnet** | http://localhost:3999 | Local Development | 🔴 Local only |
+
+### Network-Aware Contract Addresses
+
+Configure contract addresses for each network:
+
+```bash
+# Mainnet
+NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS=SP2JXKMH4R3YJJ5MKBAXJ5DZX3N6Q6S59GVHWFVS7.staking
+
+# Testnet
+NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS=SN2JXKMH4R3YJJ5MKBAXJ5DZX3N6Q6S59GVHWFVS7.staking-test
+
+# Devnet
+NEXT_PUBLIC_STAKING_CONTRACT_ADDRESS=SN2JXKMH4R3YJJ5MKBAXJ5DZX3N6Q6S59GVHWFVS7.staking-dev
+```
+
+### Runtime Network Selection
+
+Switch networks dynamically using the `useNetwork` hook:
+
+```typescript
+import { useNetwork } from '@/hooks';
+
+function NetworkSwitcher() {
+  const { currentNetwork, networks, changeNetwork } = useNetwork();
+  
+  return (
+    <select value={currentNetwork} onChange={(e) => changeNetwork(e.target.value)}>
+      {networks.map(net => (
+        <option key={net.name} value={net.name}>
+          {net.displayName}
+        </option>
+      ))}
+    </select>
+  );
+}
+```
+
+### Devnet Setup
+
+To develop locally with Devnet:
+
+1. Install Clarity DevNet:
+   ```bash
+   npm install -g @stacks/clarinet
+   ```
+
+2. Start Devnet:
+   ```bash
+   cd ../stakingContract
+   clarinet integrate
+   ```
+
+3. Configure frontend:
+   ```bash
+   NEXT_PUBLIC_STACKS_NETWORK=devnet npm run dev
+   ```
+
+For detailed network configuration, see [docs/NETWORKS.md](./docs/NETWORKS.md).
