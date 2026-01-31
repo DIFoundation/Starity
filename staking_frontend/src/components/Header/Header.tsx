@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useConnect, useAccount, useAuthRequest } from '@stacks/connect-react';
 import { STACKS_MAINNET } from '@stacks/network';
-import { Button, Box, Text, Flex, Avatar, Menu, MenuButton, MenuList, MenuItem } from '@chakra-ui/react';
+import { Button, Box, Text, Flex, Avatar, Menu, MenuButton, MenuList, MenuItem, useToast } from '@chakra-ui/react';
 import { FiLogOut, FiUser } from 'react-icons/fi';
 
 export const Header = () => {
@@ -9,6 +9,11 @@ export const Header = () => {
   const { address } = useAccount();
   const [mounted, setMounted] = useState(false);
   const { doOpenAuth: connect } = useConnect();
+  const toast = useToast();
+
+  // Local UI state for connection process
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   // Set mounted to true after component mounts to avoid hydration mismatch
   useEffect(() => {
@@ -23,19 +28,47 @@ export const Header = () => {
 
   // Handle wallet connection
   const handleConnectWallet = () => {
+    setConnectError(null);
+    setIsConnecting(true);
+
     const authOrigin = window.location.origin;
     const appDetails = {
       name: 'Staking DApp',
       icon: `${window.location.origin}/logo192.png`,
     };
 
-    connect({
-      appDetails,
-      onFinish: () => {
-        window.location.reload();
-      },
-      userSession: undefined, // Uses default
-    });
+    try {
+      console.log('analytics:event', 'wallet_connect_start');
+      connect({
+        appDetails,
+        onFinish: () => {
+          setIsConnecting(false);
+          console.log('analytics:event', 'wallet_connect_success');
+          toast({ title: 'Wallet connected', status: 'success', duration: 3000 });
+          window.location.reload();
+        },
+        onCancel: () => {
+          setIsConnecting(false);
+          setConnectError('Connection cancelled by user');
+          console.log('analytics:event', 'wallet_connect_cancel');
+          toast({ title: 'Connection cancelled', status: 'warning', duration: 3000 });
+        },
+        onError: (err: any) => {
+          setIsConnecting(false);
+          const message = err?.message || 'Failed to connect wallet';
+          setConnectError(message);
+          console.log('analytics:event', 'wallet_connect_failure', message);
+          toast({ title: 'Connection failed', description: message, status: 'error', duration: 6000 });
+        },
+        userSession: undefined, // Uses default
+      });
+    } catch (err: any) {
+      setIsConnecting(false);
+      const message = err?.message || 'Failed to initiate connection';
+      setConnectError(message);
+      console.log('analytics:event', 'wallet_connect_error', message);
+      toast({ title: 'Connection error', description: message, status: 'error', duration: 6000 });
+    }
   };
 
   // Handle logout
@@ -43,6 +76,7 @@ export const Header = () => {
     // You might need to implement this based on your auth setup
     // For example, if using @stacks/connect:
     // userSession.signUserOut(window.location.origin);
+    toast({ title: 'Disconnected', status: 'info', duration: 2500 });
     window.location.reload();
   };
 
@@ -84,13 +118,33 @@ export const Header = () => {
             </MenuList>
           </Menu>
         ) : (
-          <Button 
-            colorScheme="purple" 
-            onClick={handleConnectWallet}
-            isLoading={!mounted}
-          >
-            Connect Wallet
-          </Button>
+          <Box>
+            {connectError && (
+              <Box role="alert" bg="red.50" borderRadius="md" p={2} mb={2} aria-live="assertive">
+                <Flex alignItems="center" justifyContent="space-between">
+                  <Text color="red.700" fontSize="sm">{connectError}</Text>
+                  <Flex>
+                    <Button size="sm" mr={2} onClick={() => { console.log('analytics:event','wallet_connect_retry'); setConnectError(null); handleConnectWallet(); }}>
+                      Retry
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConnectError(null)}>
+                      Dismiss
+                    </Button>
+                  </Flex>
+                </Flex>
+              </Box>
+            )}
+
+            <Button 
+              colorScheme="purple" 
+              onClick={handleConnectWallet}
+              isLoading={isConnecting || !mounted}
+              aria-disabled={isConnecting}
+              aria-busy={isConnecting}
+            >
+              <span aria-live="polite">{isConnecting ? 'Connecting…' : 'Connect Wallet'}</span>
+            </Button>
+          </Box>
         )}
       </Flex>
     </Box>
