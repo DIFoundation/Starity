@@ -24,4 +24,20 @@ describe('Header', () => {
     // After clicking we expect to see 'Connecting' text appear or button disabled
     expect(screen.getByRole('button', { name: /connecting/i })).toBeInTheDocument();
   });
+
+  it('shows error banner when connect reports an error', async () => {
+    // Override the connect mock to call onError
+    vi.mocked(require('@stacks/connect-react').useConnect).mockImplementation(() => ({
+      doOpenAuth: (opts: any) => {
+        if (opts?.onError) opts.onError(new Error('mock failure'));
+      }
+    }));
+
+    render(<Header />);
+    const btn = screen.getByRole('button', { name: /connect wallet/i });
+    fireEvent.click(btn);
+
+    expect(await screen.findByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText(/mock failure/i)).toBeInTheDocument();
+  });
 });
