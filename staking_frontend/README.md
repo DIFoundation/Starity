@@ -187,3 +187,13 @@ To develop locally with Devnet:
    ```
 
 For detailed network configuration, see [docs/NETWORKS.md](./docs/NETWORKS.md).
+
+## Header Loading and Error States
+
+The application header now handles wallet authentication states more robustly:
+
+- Clicking "Connect Wallet" shows a loading state (`Connecting…`) on the button while the auth flow is in progress.
+- If the auth flow fails or is cancelled an inline error banner appears with `Retry` and `Dismiss` actions.
+- Toast notifications surface connection success, cancellation, and errors.
+
+This improves discoverability and helps users recover from connection failures quickly.
