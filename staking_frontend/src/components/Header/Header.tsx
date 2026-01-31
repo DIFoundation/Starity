@@ -71,6 +71,7 @@ export const Header = () => {
     // You might need to implement this based on your auth setup
     // For example, if using @stacks/connect:
     // userSession.signUserOut(window.location.origin);
+    toast({ title: 'Disconnected', status: 'info', duration: 2500 });
     window.location.reload();
   };
 
