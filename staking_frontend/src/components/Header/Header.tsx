@@ -112,13 +112,32 @@ export const Header = () => {
             </MenuList>
           </Menu>
         ) : (
-          <Button 
-            colorScheme="purple" 
-            onClick={handleConnectWallet}
-            isLoading={!mounted}
-          >
-            Connect Wallet
-          </Button>
+          <Box>
+            {connectError && (
+              <Box role="alert" bg="red.50" borderRadius="md" p={2} mb={2} aria-live="assertive">
+                <Flex alignItems="center" justifyContent="space-between">
+                  <Text color="red.700" fontSize="sm">{connectError}</Text>
+                  <Flex>
+                    <Button size="sm" mr={2} onClick={() => { setConnectError(null); handleConnectWallet(); }}>
+                      Retry
+                    </Button>
+                    <Button size="sm" variant="ghost" onClick={() => setConnectError(null)}>
+                      Dismiss
+                    </Button>
+                  </Flex>
+                </Flex>
+              </Box>
+            )}
+
+            <Button 
+              colorScheme="purple" 
+              onClick={handleConnectWallet}
+              isLoading={isConnecting || !mounted}
+              aria-disabled={isConnecting}
+            >
+              {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+            </Button>
+          </Box>
         )}
       </Flex>
     </Box>
