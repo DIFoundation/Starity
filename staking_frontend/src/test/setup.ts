@@ -1,6 +1,16 @@
 import '@testing-library/jest-dom';
 import { vi } from 'vitest';
 
+// Mock @stacks/transactions
+vi.mock('@stacks/transactions', () => ({
+  principalCV: vi.fn((value) => ({ type: 'principal', value })),
+  standardPrincipalCV: vi.fn((value) => ({ type: 'principal', value })),
+  uintCV: vi.fn((value) => ({ type: 'uint', value })),
+  broadcastTransaction: vi.fn(),
+  makeContractCall: vi.fn(),
+  contractPrincipalCV: vi.fn((address, name) => ({ type: 'principal', address, name })),
+}));
+
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
