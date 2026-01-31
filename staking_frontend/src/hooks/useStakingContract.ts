@@ -4,6 +4,7 @@ import { getStacksNetwork } from '@/config/networks';
 import { uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { callReadOnlyWithRetry } from '@/services/contractService';
 import { prepareStakingCall } from '@/services/contractWrite';
+import { RATE_LIMITERS, RateLimitError } from '@/services/security';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 import {
   validateStakingParams,
@@ -16,7 +17,12 @@ import {
 // Get network from centralized config with support for mainnet, testnet, devnet
 const network = getStacksNetwork(FRONTEND_ENV.STACKS_NETWORK);
 
-export const useStakingContract = () => {
+export interface UseStakingContractOptions {
+  disableRateLimiting?: boolean;
+  onRateLimited?: (error: RateLimitError, action: string) => void;
+}
+
+export const useStakingContract = (opts?: UseStakingContractOptions) => {
   // Helper function to call read-only functions
   const callReadOnly = useCallback(async (functionName: string, args: any[] = []) => {
     const senderAddress = FRONTEND_ENV.DEFAULT_SENDER || 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
@@ -52,6 +58,7 @@ export const useStakingContract = () => {
   /**
    * Prepare a staking call (delegation to service layer).
    * Returns transaction options that can be used with @stacks/connect doContractCall.
+   * Includes built-in rate limiting to prevent spam.
    */
   const prepareStakingCallHelper = useCallback(
     (functionName: string, params: StakingFunctionParams) => {
@@ -61,9 +68,12 @@ export const useStakingContract = () => {
 
       // Map function names to staking action types
       let action: 'stake' | 'unstake' | 'claim-rewards';
+      let limiter = null;
+
       switch (functionName) {
         case STAKING_CONTRACT.FUNCTIONS.STAKE:
           action = 'stake';
+          limiter = RATE_LIMITERS.stake;
           // Validate stake parameters
           const stakeValidation = validateStakingParams(params.amount ?? 0, tokenAddress);
           if (!stakeValidation.isValid) {
@@ -74,6 +84,7 @@ export const useStakingContract = () => {
 
         case STAKING_CONTRACT.FUNCTIONS.UNSTAKE:
           action = 'unstake';
+          limiter = RATE_LIMITERS.unstake;
           // Validate unstake parameters
           const unstakeValidation = validateUnstakingParams(
             params.amount ?? 0,
@@ -88,6 +99,7 @@ export const useStakingContract = () => {
 
         case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS:
           action = 'claim-rewards';
+          limiter = RATE_LIMITERS.claimRewards;
           // Validate claim rewards parameters
           const claimValidation = validateClaimRewardsParams(tokenAddress, params.pendingRewards ?? 0);
           if (!claimValidation.isValid) {
@@ -97,6 +109,22 @@ export const useStakingContract = () => {
 
         default:
           throw new Error(`Unknown function: ${functionName}`);
+      }
+
+      // Check rate limit unless disabled
+      if (!opts?.disableRateLimiting && limiter) {
+        const rateLimitKey = `${action}:${contractAddress}`;
+        const result = limiter.check(rateLimitKey);
+
+        if (!result.allowed) {
+          const error = new RateLimitError(
+            `${action} rate limit exceeded`,
+            result.resetTimeMs,
+            result.remainingAttempts
+          );
+          opts?.onRateLimited?.(error, action);
+          throw error;
+        }
       }
 
       // Delegate to service layer for transaction preparation
@@ -109,7 +137,7 @@ export const useStakingContract = () => {
         amount: params.amount,
       });
     },
-    []
+    [opts]
   );
 
   /**
