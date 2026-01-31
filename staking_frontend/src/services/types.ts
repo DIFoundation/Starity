@@ -21,3 +21,21 @@ export interface ServiceResult<T = any> {
   data?: T;
   error?: Error;
 }
+
+export interface ContractWriteOptions {
+  network: StacksNetwork | any;
+  contractAddress: string;
+  contractName: string;
+  functionName: string;
+  functionArgs?: ClarityValue[] | any[];
+  postConditionMode?: string;
+  postConditions?: any[];
+  fee?: number;
+  nonce?: number;
+}
+
+export interface SubmitResult {
+  txId?: string;
+  success: boolean;
+  error?: Error;
+}

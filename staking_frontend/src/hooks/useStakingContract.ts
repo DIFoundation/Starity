@@ -3,6 +3,7 @@ import FRONTEND_ENV from '@/config/env';
 import { getStacksNetwork } from '@/config/networks';
 import { uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
 import { callReadOnlyWithRetry } from '@/services/contractService';
+import { prepareStakingCall } from '@/services/contractWrite';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 import {
   validateStakingParams,
@@ -48,126 +49,88 @@ export const useStakingContract = () => {
     };
   }, [callReadOnly]);
 
-  // Prepare transaction for write functions (with validation)
-  const prepareTransaction = useCallback((functionName: string, params: StakingFunctionParams) => {
-    const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
-    const [baseContractAddress, baseContractName] = contractIdentifier.split('.');
-    const tokenAddress = params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT;
-    
-    const baseOptions = {
-      contractAddress: baseContractAddress,
-      contractName: baseContractName,
-      functionName,
-      network,
-    };
+  /**
+   * Prepare a staking call (delegation to service layer).
+   * Returns transaction options that can be used with @stacks/connect doContractCall.
+   */
+  const prepareStakingCallHelper = useCallback(
+    (functionName: string, params: StakingFunctionParams) => {
+      const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
+      const [contractAddress, contractName] = contractIdentifier.split('.');
+      const tokenAddress = params.token ?? FRONTEND_ENV.STAKING_TOKEN_CONTRACT;
 
-    switch (functionName) {
-      case STAKING_CONTRACT.FUNCTIONS.STAKE: {
-        // Validate stake parameters
-        const validation = validateStakingParams(params.amount ?? 0, tokenAddress);
-        if (!validation.isValid) {
-          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
-        }
-        
-        const amount = convertToSmallestUnit(validation.data ?? 0);
-        return {
-          ...baseOptions,
-          functionArgs: [
-            standardPrincipalCV(tokenAddress!), // Token contract address
-            uintCV(amount), // Amount to stake (in smallest units)
-          ],
-        };
+      // Map function names to staking action types
+      let action: 'stake' | 'unstake' | 'claim-rewards';
+      switch (functionName) {
+        case STAKING_CONTRACT.FUNCTIONS.STAKE:
+          action = 'stake';
+          // Validate stake parameters
+          const stakeValidation = validateStakingParams(params.amount ?? 0, tokenAddress);
+          if (!stakeValidation.isValid) {
+            throw new Error(stakeValidation.error || ValidationMessages.GENERAL_ERROR);
+          }
+          const stakeAmount = convertToSmallestUnit(stakeValidation.data ?? 0);
+          break;
+
+        case STAKING_CONTRACT.FUNCTIONS.UNSTAKE:
+          action = 'unstake';
+          // Validate unstake parameters
+          const unstakeValidation = validateUnstakingParams(
+            params.amount ?? 0,
+            tokenAddress,
+            params.stakedAmount ?? 0
+          );
+          if (!unstakeValidation.isValid) {
+            throw new Error(unstakeValidation.error || ValidationMessages.GENERAL_ERROR);
+          }
+          const unstakeAmount = convertToSmallestUnit(unstakeValidation.data ?? 0);
+          break;
+
+        case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS:
+          action = 'claim-rewards';
+          // Validate claim rewards parameters
+          const claimValidation = validateClaimRewardsParams(tokenAddress, params.pendingRewards ?? 0);
+          if (!claimValidation.isValid) {
+            throw new Error(claimValidation.error || ValidationMessages.GENERAL_ERROR);
+          }
+          break;
+
+        default:
+          throw new Error(`Unknown function: ${functionName}`);
       }
-      case STAKING_CONTRACT.FUNCTIONS.UNSTAKE: {
-        // Validate unstake parameters
-        const validation = validateUnstakingParams(
-          params.amount ?? 0,
-          tokenAddress,
-          params.stakedAmount ?? 0
-        );
-        if (!validation.isValid) {
-          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
-        }
-        
-        const amount = convertToSmallestUnit(validation.data ?? 0);
-        return {
-          ...baseOptions,
-          functionArgs: [
-            standardPrincipalCV(tokenAddress!), // Token contract address
-            uintCV(amount), // Amount to unstake (in smallest units)
-          ],
-        };
-      }
-      case STAKING_CONTRACT.FUNCTIONS.CLAIM_REWARDS: {
-        // Validate claim rewards parameters
-        const validation = validateClaimRewardsParams(tokenAddress, params.pendingRewards ?? 0);
-        if (!validation.isValid) {
-          throw new Error(validation.error || ValidationMessages.GENERAL_ERROR);
-        }
-        
-        return {
-          ...baseOptions,
-          functionArgs: [
-            standardPrincipalCV(tokenAddress!), // Token contract address
-          ],
-        };
-      }
-      case STAKING_CONTRACT.FUNCTIONS.SET_PAUSED:
-        return {
-          ...baseOptions,
-          functionArgs: [
-            boolCV(params.status!), // Pause status
-          ],
-        };
-      default:
-        throw new Error(`Unknown function: ${functionName}`);
-    }
-  }, []);
+
+      // Delegate to service layer for transaction preparation
+      return prepareStakingCall({
+        network,
+        contractAddress,
+        contractName,
+        tokenContractAddress: tokenAddress!,
+        action,
+        amount: params.amount,
+      });
+    },
+    []
+  );
+
+  /**
+   * Prepare transaction for write functions (legacy API compatibility).
+   * Uses validation and delegates to prepareStakingCallHelper.
+   */
+  const prepareTransaction = useCallback((functionName: string, params: StakingFunctionParams) => {
+    return prepareStakingCallHelper(functionName, params);
+  }, [prepareStakingCallHelper]);
 
   return {
     // Read functions
     getUserInfo,
     getContractState,
-    
+
     // Write functions (these need to be used with @stacks/connect or similar)
     prepareTransaction,
-    
+    prepareStakingCallHelper,
+
     // Constants
     CONTRACT_ADDRESS: STAKING_CONTRACT.CONTRACT_ADDRESS,
     FUNCTIONS: STAKING_CONTRACT.FUNCTIONS,
   };
 };
-
-// Example usage in a component:
-/*
-import { useStakingContract } from '@/hooks/useStakingContract';
-
-function StakingComponent() {
-  const { 
-    getUserInfo, 
-    getContractState, 
-    prepareTransaction,
-    CONTRACT_ADDRESS,
-    FUNCTIONS 
-  } = useStakingContract();
-  
-  // Example: Get user info
-  const fetchUserInfo = async () => {
-    const userData = await getUserInfo(userAddress);
-    console.log('User staking info:', userData);
-  };
-  
-  // Example: Prepare a stake transaction (uses env default token if not provided)
-  const handleStake = async () => {
-    const txOptions = prepareTransaction(FUNCTIONS.STAKE, {
-      // `token` can be omitted to use NEXT_PUBLIC_STAKING_TOKEN_CONTRACT from env
-      amount: 1000000, // Amount in the smallest unit
-    });
-    
-    // Use with @stacks/connect or your preferred wallet connection
-    // await doContractCall(txOptions);
-  };
-  
-  // ... rest of your component
-}
-*/
