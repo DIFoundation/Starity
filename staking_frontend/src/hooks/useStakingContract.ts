@@ -1,7 +1,8 @@
 import { useCallback } from 'react';
 import FRONTEND_ENV from '@/config/env';
 import { getStacksNetwork } from '@/config/networks';
-import { fetchCallReadOnlyFunction, cvToValue, uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
+import { uintCV, boolCV, standardPrincipalCV } from '@stacks/transactions';
+import { callReadOnlyWithRetry } from '@/services/contractService';
 import { STAKING_CONTRACT, StakingFunction, StakingFunctionParams } from '@/utils/contracts';
 import {
   validateStakingParams,
@@ -17,19 +18,16 @@ const network = getStacksNetwork(FRONTEND_ENV.STACKS_NETWORK);
 export const useStakingContract = () => {
   // Helper function to call read-only functions
   const callReadOnly = useCallback(async (functionName: string, args: any[] = []) => {
+    const senderAddress = FRONTEND_ENV.DEFAULT_SENDER || 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
+    const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
     try {
-      const senderAddress = FRONTEND_ENV.DEFAULT_SENDER || 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE';
-      const contractIdentifier = FRONTEND_ENV.STAKING_CONTRACT_ADDRESS || STAKING_CONTRACT.CONTRACT_ADDRESS;
-      const [contractAddress, contractName] = contractIdentifier.split('.');
-      const result = await fetchCallReadOnlyFunction({
+      return await callReadOnlyWithRetry({
         network,
-        contractAddress,
-        contractName,
+        contractIdentifier,
         functionName,
         functionArgs: args,
-        senderAddress, // Default sender, can be overridden
+        senderAddress,
       });
-      return cvToValue(result);
     } catch (error) {
       console.error(`Error calling ${functionName}:`, error);
       throw error;
