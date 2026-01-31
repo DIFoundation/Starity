@@ -134,8 +134,9 @@ export const Header = () => {
               onClick={handleConnectWallet}
               isLoading={isConnecting || !mounted}
               aria-disabled={isConnecting}
+              aria-busy={isConnecting}
             >
-              {isConnecting ? 'Connecting…' : 'Connect Wallet'}
+              <span aria-live="polite">{isConnecting ? 'Connecting…' : 'Connect Wallet'}</span>
             </Button>
           </Box>
         )}
