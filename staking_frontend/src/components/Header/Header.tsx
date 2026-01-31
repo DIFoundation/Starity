@@ -124,7 +124,7 @@ export const Header = () => {
                 <Flex alignItems="center" justifyContent="space-between">
                   <Text color="red.700" fontSize="sm">{connectError}</Text>
                   <Flex>
-                    <Button size="sm" mr={2} onClick={() => { setConnectError(null); handleConnectWallet(); }}>
+                    <Button size="sm" mr={2} onClick={() => { console.log('analytics:event','wallet_connect_retry'); setConnectError(null); handleConnectWallet(); }}>
                       Retry
                     </Button>
                     <Button size="sm" variant="ghost" onClick={() => setConnectError(null)}>
