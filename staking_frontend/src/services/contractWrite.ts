@@ -1,11 +1,23 @@
-import { broadcastTransaction } from '@stacks/transactions';
+import { broadcastTransaction, standardPrincipalCV, uintCV } from '@stacks/transactions';
 import { ContractWriteOptions, SubmitResult } from './types';
 import { ContractServiceError } from './errors';
 import { retryWithBackoff } from './retry';
 
+export type StakingAction = 'stake' | 'unstake' | 'claim-rewards';
+
+export interface PrepareStakingCallOptions {
+  network: any;
+  contractAddress: string;
+  contractName: string;
+  tokenContractAddress: string;
+  action: StakingAction;
+  amount?: string | number;
+  userAddress?: string;
+}
+
 /**
  * Prepare a write-call payload that can be consumed by a wallet or used to
- * construct and sign a transaction.
+ * construct and sign a transaction. Generic version.
  */
 export function prepareContractCall(opts: ContractWriteOptions) {
   const {
@@ -35,6 +47,67 @@ export function prepareContractCall(opts: ContractWriteOptions) {
     postConditions,
     network,
   };
+}
+
+/**
+ * Prepare a staking contract call with proper argument construction for
+ * stake, unstake, or claim-rewards operations.
+ */
+export function prepareStakingCall(opts: PrepareStakingCallOptions) {
+  const {
+    network,
+    contractAddress,
+    contractName,
+    tokenContractAddress,
+    action,
+    amount,
+    userAddress,
+  } = opts;
+
+  if (!contractAddress || !contractName || !tokenContractAddress) {
+    throw new ContractServiceError('Missing contract parameters', 'MISSING_PARAMS', false);
+  }
+
+  let functionArgs: any[] = [];
+  let functionName = '';
+
+  switch (action) {
+    case 'stake':
+      if (!amount) throw new ContractServiceError('Amount required for stake', 'MISSING_AMOUNT', false);
+      functionName = 'stake';
+      functionArgs = [
+        standardPrincipalCV(tokenContractAddress),
+        uintCV(amount.toString()),
+      ];
+      break;
+
+    case 'unstake':
+      if (!amount) throw new ContractServiceError('Amount required for unstake', 'MISSING_AMOUNT', false);
+      functionName = 'unstake';
+      functionArgs = [
+        standardPrincipalCV(tokenContractAddress),
+        uintCV(amount.toString()),
+      ];
+      break;
+
+    case 'claim-rewards':
+      functionName = 'claim-rewards';
+      functionArgs = [
+        standardPrincipalCV(tokenContractAddress),
+      ];
+      break;
+
+    default:
+      throw new ContractServiceError(`Unknown action: ${action}`, 'UNKNOWN_ACTION', false);
+  }
+
+  return prepareContractCall({
+    network,
+    contractAddress,
+    contractName,
+    functionName,
+    functionArgs,
+  });
 }
 
 /**
@@ -98,6 +171,7 @@ export async function waitForConfirmation(txId: string, network: any, timeoutMs 
 
 export default {
   prepareContractCall,
+  prepareStakingCall,
   submitSignedTransaction,
   waitForConfirmation,
 };
