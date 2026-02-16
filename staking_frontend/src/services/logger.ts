@@ -21,9 +21,18 @@ export class Logger {
   }
 
   static logError(error: Error, context?: LogErrorContext) {
-    // Placeholder: implement error tracking
-    // e.g., send to Sentry or error backend
-    console.error('[error]', error, context || {});
+    // Structured error tracking: add timestamp, error details, and context
+    const errorPayload = {
+      type: 'error',
+      timestamp: new Date().toISOString(),
+      name: error.name,
+      message: error.message,
+      stack: error.stack,
+      context: context || {},
+    };
+    // TODO: Integrate with Sentry or error tracking backend
+    // For now, log to console in a structured way
+    console.error('[analytics:error]', JSON.stringify(errorPayload));
   }
 
   static logTransaction(txHash: string, status: TransactionStatus, meta?: LogEventData) {
