@@ -51,11 +51,11 @@
 ;; SIP-010 Transfer
 (define-public (transfer (amount uint) (sender principal) (recipient principal) (memo (optional (buff 34))))
     (begin
-        ;; Security: Ensure the sender is the one calling the function
-        (asserts! (or (is-eq tx-sender sender) (is-eq contract-caller sender)) ERR-NOT-TOKEN-OWNER)
-        
+        ;; Security: Ensure only the token owner can invoke transfers on their behalf
+        (asserts! (is-eq tx-sender sender) ERR-NOT-TOKEN-OWNER)
+
         (try! (ft-transfer? staking-token amount sender recipient))
-        
+
         ;; Print memo if it exists
         (match memo to-print (print to-print) 0x)
         (ok true)
