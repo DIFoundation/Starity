@@ -1,5 +1,6 @@
 import { broadcastTransaction, standardPrincipalCV, uintCV } from '@stacks/transactions';
 import { ContractWriteOptions, SubmitResult } from './types';
+import Logger from './logger';
 import { ContractServiceError } from './errors';
 import { retryWithBackoff } from './retry';
 
@@ -20,6 +21,7 @@ export interface PrepareStakingCallOptions {
  * construct and sign a transaction. Generic version.
  */
 export function prepareContractCall(opts: ContractWriteOptions) {
+    Logger.logEvent('prepare_contract_call', { contractAddress, contractName, functionName });
   const {
     contractAddress,
     contractName,
@@ -54,6 +56,7 @@ export function prepareContractCall(opts: ContractWriteOptions) {
  * stake, unstake, or claim-rewards operations.
  */
 export function prepareStakingCall(opts: PrepareStakingCallOptions) {
+    Logger.logEvent('prepare_staking_call', { action: opts.action, contract: opts.contractAddress });
   const {
     network,
     contractAddress,

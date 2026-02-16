@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import Logger from '../../services/logger';
 import { useConnect, useAccount, useAuthRequest } from '@stacks/connect-react';
 import { STACKS_MAINNET } from '@stacks/network';
 import { Button, Box, Text, Flex, Avatar, Menu, MenuButton, MenuList, MenuItem, useToast } from '@chakra-ui/react';
@@ -38,26 +39,26 @@ export const Header = () => {
     };
 
     try {
-      console.log('analytics:event', 'wallet_connect_start');
+      Logger.logEvent('wallet_connect_start');
       connect({
         appDetails,
         onFinish: () => {
           setIsConnecting(false);
-          console.log('analytics:event', 'wallet_connect_success');
+          Logger.logEvent('wallet_connect_success');
           toast({ title: 'Wallet connected', status: 'success', duration: 3000 });
           window.location.reload();
         },
         onCancel: () => {
           setIsConnecting(false);
           setConnectError('Connection cancelled by user');
-          console.log('analytics:event', 'wallet_connect_cancel');
+          Logger.logEvent('wallet_connect_cancel');
           toast({ title: 'Connection cancelled', status: 'warning', duration: 3000 });
         },
         onError: (err: any) => {
           setIsConnecting(false);
           const message = err?.message || 'Failed to connect wallet';
           setConnectError(message);
-          console.log('analytics:event', 'wallet_connect_failure', message);
+          Logger.logEvent('wallet_connect_failure', { message });
           toast({ title: 'Connection failed', description: message, status: 'error', duration: 6000 });
         },
         userSession: undefined, // Uses default
