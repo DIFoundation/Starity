@@ -1,3 +1,4 @@
+import { initSentry, captureSentryError } from './sentry';
 import { initLogRocket } from './logrocket';
 // staking_frontend/src/services/logger.ts
 // Centralized logging and analytics service for Starity
@@ -8,6 +9,19 @@ export type LogErrorContext = Record<string, unknown>;
 export type TransactionStatus = 'pending' | 'success' | 'failed';
 
 export class Logger {
+      static initializeAll() {
+        // Optionally initialize LogRocket and Sentry if env variables are set
+        if (typeof window !== 'undefined') {
+          const logrocketId = process.env.NEXT_PUBLIC_LOGROCKET_ID;
+          if (logrocketId) {
+            initLogRocket(logrocketId);
+          }
+          const sentryDsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+          if (sentryDsn) {
+            initSentry(sentryDsn);
+          }
+        }
+      }
     static initialize() {
       // Optionally initialize LogRocket if env variable is set
       if (typeof window !== 'undefined') {
@@ -40,7 +54,10 @@ export class Logger {
       stack: error.stack,
       context: context || {},
     };
-    // TODO: Integrate with Sentry or error tracking backend
+    // Integrate with Sentry if available
+    if (typeof window !== 'undefined' && process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      captureSentryError(error, context);
+    }
     // For now, log to console in a structured way
     console.error('[analytics:error]', JSON.stringify(errorPayload));
   }
