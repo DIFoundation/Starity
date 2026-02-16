@@ -36,9 +36,17 @@ export class Logger {
   }
 
   static logTransaction(txHash: string, status: TransactionStatus, meta?: LogEventData) {
-    // Placeholder: implement transaction tracking
-    // e.g., send to analytics backend or console
-    console.log('[transaction]', txHash, status, meta || {});
+    // Structured transaction tracking: add timestamp, txHash, status, and meta
+    const txPayload = {
+      type: 'transaction',
+      timestamp: new Date().toISOString(),
+      txHash,
+      status,
+      meta: meta || {},
+    };
+    // TODO: Integrate with analytics backend
+    // For now, log to console in a structured way
+    console.log('[analytics:transaction]', JSON.stringify(txPayload));
   }
 }
 
