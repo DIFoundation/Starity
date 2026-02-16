@@ -45,7 +45,8 @@
         (asserts! (not (var-get is-paused)) ERR-PAUSED)
         
         ;; 1. Transfer tokens from user to contract
-        (try! (contract-call? token transfer amount user (as-contract tx-sender) none))
+        ;; token.transfer(amount, sender=user, recipient=as-contract())
+        (try! (contract-call? token transfer amount user (as-contract) none))
         
         ;; 2. Update Map (adding earned rewards to pending and resetting timer)
         (map-set UserInfo user {
@@ -67,8 +68,9 @@
     )
         (asserts! (>= (get staked-amount data) amount) ERR-INSUFFICIENT-FUNDS)
 
-        ;; 1. Transfer tokens back to user
-        (try! (as-contract (contract-call? token transfer amount tx-sender user none)))
+        ;; 1. Transfer tokens back to user (contract -> user)
+        ;; token.transfer(amount, sender=as-contract(), recipient=user)
+        (try! (contract-call? token transfer amount (as-contract) tx-sender none))
 
         ;; 2. Update Map
         (map-set UserInfo user {
@@ -95,7 +97,8 @@
 
         ;; 1. The contract mints or transfers the rewards to the user
         ;; Note: The contract must have enough STK balance or minting authority
-        (try! (as-contract (contract-call? token transfer total-to-claim tx-sender user none)))
+        ;; token.transfer(total-to-claim, sender=as-contract(), recipient=user)
+        (try! (contract-call? token transfer total-to-claim (as-contract) user none))
 
         ;; 2. Reset the user's pending rewards and update the timestamp
         (map-set UserInfo user (merge data {
