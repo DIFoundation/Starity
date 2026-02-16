@@ -1,3 +1,4 @@
+import { initLogRocket } from './logrocket';
 // staking_frontend/src/services/logger.ts
 // Centralized logging and analytics service for Starity
 
@@ -7,6 +8,15 @@ export type LogErrorContext = Record<string, unknown>;
 export type TransactionStatus = 'pending' | 'success' | 'failed';
 
 export class Logger {
+    static initialize() {
+      // Optionally initialize LogRocket if env variable is set
+      if (typeof window !== 'undefined') {
+        const logrocketId = process.env.NEXT_PUBLIC_LOGROCKET_ID;
+        if (logrocketId) {
+          initLogRocket(logrocketId);
+        }
+      }
+    }
   static logEvent(eventName: string, data?: LogEventData) {
     // Structured event logging: add timestamp, event name, and data
     const eventPayload = {
