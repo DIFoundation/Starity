@@ -5,6 +5,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { Connect, useAuth } from '@stacks/connect-react';
 import { STACKS_MAINNET } from '@stacks/network';
 import Header from '@/components/Header';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -33,8 +34,10 @@ export default function RootLayout({
               network,
             }}
           >
-            <Header />
-            <main>{children}</main>
+            <ErrorBoundary>
+              <Header />
+              <main>{children}</main>
+            </ErrorBoundary>
           </Connect>
         </ChakraProvider>
       </body>
