@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Clarinet, Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.34.0/index.ts';
+import { Tx, Chain, Account, types } from 'https://deno.land/x/clarinet@v0.34.0/index.ts';
 
 describe('Staking Contract - Advanced Error Scenarios', () => {
   let chain: Chain;
