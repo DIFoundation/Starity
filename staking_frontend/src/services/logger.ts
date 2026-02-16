@@ -8,9 +8,16 @@ export type TransactionStatus = 'pending' | 'success' | 'failed';
 
 export class Logger {
   static logEvent(eventName: string, data?: LogEventData) {
-    // Placeholder: implement structured event logging
-    // e.g., send to analytics backend or console
-    console.log('[event]', eventName, data || {});
+    // Structured event logging: add timestamp, event name, and data
+    const eventPayload = {
+      type: 'event',
+      timestamp: new Date().toISOString(),
+      event: eventName,
+      data: data || {},
+    };
+    // TODO: Integrate with analytics backend (Mixpanel, Amplitude, etc.)
+    // For now, log to console in a structured way
+    console.log('[analytics:event]', JSON.stringify(eventPayload));
   }
 
   static logError(error: Error, context?: LogErrorContext) {
