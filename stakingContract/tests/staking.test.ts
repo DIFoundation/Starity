@@ -417,6 +417,7 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     expect(unstake.result).toBeOk(true);
   });
 
+  
   it("total-staked is consistent across operations", () => {
     const stakeAmount1 = 1000;
     const stakeAmount2 = 500;
@@ -450,5 +451,195 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     
     state = getContractState();
     expect(state.totalStaked).toBeUint(stakeAmount1 + stakeAmount2 - 250);
+  });
+});
+
+   // ======= COMPOUND REWARDS TESTS =======
+describe("Compound Rewards Function", () => {
+  beforeEach(() => {
+    // Setup: stake tokens to generate rewards
+    simnet.callPublicFn(
+      "staking",
+      "stake",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      wallet1
+    );
+    
+    // Advance blocks to accumulate rewards
+    for (let i = 0; i < 10; i++) {
+      simnet.mineEmptyBlock();
+    }
+  });
+
+  it("user can compound rewards", () => {
+    const result = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    expect(result.result).toBeOk();
+    
+    // Verify compound count increased
+    const compoundCount = simnet.callReadOnlyFn(
+      "staking",
+      "get-compound-count",
+      [`'${wallet1}`],
+      deployer
+    );
+    expect(compoundCount.result).toBeUint(1);
+  });
+
+  it("compounding increases stake without claiming", () => {
+    // Get stake amount before compounding
+    const beforeInfo = simnet.callReadOnlyFn(
+      "staking",
+      "get-user-info",
+      [`'${wallet1}`],
+      deployer
+    );
+    
+    const result = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    expect(result.result).toBeOk();
+    
+    // Get stake amount after compounding
+    const afterInfo = simnet.callReadOnlyFn(
+      "staking",
+      "get-user-info",
+      [`'${wallet1}`],
+      deployer
+    );
+    
+    // Stake amount should be higher after compounding
+    expect(afterInfo.result).not.toEqual(beforeInfo.result);
+  });
+
+  it("cannot compound when no rewards available", () => {
+    // Claim all rewards first
+    simnet.callPublicFn(
+      "staking",
+      "claim-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    
+    // Try to compound immediately after claiming
+    const result = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    expect(result.result).toBeErr(); // Should error with ERR-NO-REWARDS-TO-COMPOUND
+  });
+
+  it("cannot compound when contract is paused", () => {
+    // Pause contract
+    simnet.callPublicFn("staking", "set-paused", ["true"], deployer);
+    
+    const result = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    expect(result.result).toBeErr(); // Should error with ERR-PAUSED
+  });
+
+  it("user without stake cannot compound", () => {
+    const result = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet3
+    );
+    expect(result.result).toBeErr(); // Should error with ERR-NO-STAKE
+  });
+
+  it("compound count increments with multiple compounds", () => {
+    // First compound
+    simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    
+    // Advance more blocks for new rewards
+    for (let i = 0; i < 10; i++) {
+      simnet.mineEmptyBlock();
+    }
+    
+    // Second compound
+    simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    
+    // Verify compound count increased
+    const compoundCount = simnet.callReadOnlyFn(
+      "staking",
+      "get-compound-count",
+      [`'${wallet1}`],
+      deployer
+    );
+    expect(compoundCount.result).toBeUint(2);
+  });
+
+  it("compounding works for multiple users", () => {
+    // Stake with wallet2
+    simnet.callPublicFn(
+      "staking",
+      "stake",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u500"],
+      wallet2
+    );
+    
+    // Advance blocks
+    for (let i = 0; i < 5; i++) {
+      simnet.mineEmptyBlock();
+    }
+    
+    // Both users compound
+    const result1 = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet1
+    );
+    
+    const result2 = simnet.callPublicFn(
+      "staking",
+      "compound-rewards",
+      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      wallet2
+    );
+    
+    expect(result1.result).toBeOk();
+    expect(result2.result).toBeOk();
+    
+    // Verify compound counts
+    const count1 = simnet.callReadOnlyFn(
+      "staking",
+      "get-compound-count",
+      [`'${wallet1}`],
+      deployer
+    );
+    const count2 = simnet.callReadOnlyFn(
+      "staking",
+      "get-compound-count",
+      [`'${wallet2}`],
+      deployer
+    );
+    
+    expect(count1.result).toBeUint(1);
+    expect(count2.result).toBeUint(1);
   });
 });
