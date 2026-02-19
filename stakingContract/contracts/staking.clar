@@ -22,6 +22,8 @@
     pending-rewards: uint
 })
 
+(define-map UserCompound principal uint)
+
 ;; --- COMPREHENSIVE ERROR CODES ---
 ;; Status & Access Errors (100-109)
 (define-constant ERR-PAUSED (err u100))
@@ -62,6 +64,8 @@
 (define-constant ERR-USER-NOT-FOUND (err u152))
 (define-constant ERR-INVALID-TIMESTAMP (err u153))
 
+(define-constant ERR-COMPOUND-FAILED (err u190))
+(define-constant ERR-NO-REWARDS-TO-COMPOUND (err u191))
 ;; --- PRIVATE VALIDATION FUNCTIONS ---
 
 ;; Check if amount is within valid range
@@ -294,4 +298,51 @@
 ;; Check if contract is paused
 (define-public (is-contract-paused)
     (ok (var-get is-paused))
+)
+
+(define-public (compound-rewards (token <ft-trait>))
+    (let (
+        (user tx-sender)
+        (earned (calculate-rewards user))
+        (data (default-to {staked-amount: u0, last-update: stacks-block-time, pending-rewards: u0} (map-get? UserInfo user)))
+        (total-rewards (+ (get pending-rewards data) earned))
+    )
+        ;; Check contract is not paused
+        (asserts! (not (var-get is-paused)) ERR-PAUSED)
+        
+        ;; Check if there are rewards to compound
+        (asserts! (> total-rewards u0) ERR-NO-REWARDS-TO-COMPOUND)
+        
+        ;; Validate amount
+        (asserts! (is-valid-amount total-rewards) ERR-INVALID-AMOUNT)
+        
+        ;; Check for overflow when adding to existing stake
+        (asserts! (not (will-overflow-add (get staked-amount data) total-rewards)) ERR-OVERFLOW)
+        
+        ;; Check for overflow when adding to total staked
+        (asserts! (not (will-overflow-add (var-get total-staked) total-rewards)) ERR-OVERFLOW)
+        
+        ;; Update user - add rewards to staked amount instead of claiming
+        (map-set UserInfo user {
+            staked-amount: (+ (get staked-amount data) total-rewards),
+            last-update: stacks-block-time,
+            pending-rewards: u0
+        })
+        
+        ;; Update total staked
+        (var-set total-staked (+ (var-get total-staked) total-rewards))
+        
+        ;; Optional: Track compound count
+        (match (map-get? UserCompound user)
+            count (map-set UserCompound user (+ count u1))
+            (map-set UserCompound user u1)
+        )
+        
+        (ok total-rewards)
+    )
+)
+
+;; Optional view function to get compound count
+(define-read-only (get-compound-count (user principal))
+    (default-to u0 (map-get? UserCompound user))
 )
