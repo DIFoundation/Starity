@@ -1,297 +1,216 @@
-;; Staking Contract - Comprehensive Error Handling
-(use-trait ft-trait 'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.sip-010-trait-ft-standard.sip-010-trait)
+;; ================================
+;; PRODUCTION STAKING CONTRACT
+;; ================================
+
+;; --- CONSTANTS ---
+(define-constant ERR-NOT-OWNER (err u100))
+(define-constant ERR-PAUSED (err u101))
+(define-constant ERR-INVALID-AMOUNT (err u102))
+(define-constant ERR-NO-STAKE (err u103))
+(define-constant ERR-INSUFFICIENT-FUNDS (err u104))
+(define-constant ERR-NO-REWARDS (err u105))
+(define-constant ERR-TRANSFER-FAILED (err u106))
+
+(define-constant YEAR u31536000) ;; seconds
+(define-constant BASIS_POINTS u10000)
 
 ;; --- DATA VARS ---
-(define-data-var contract-owner principal tx-sender)
-(define-data-var is-paused bool false)
+(define-data-var owner principal tx-sender)
+(define-data-var paused bool false)
 (define-data-var total-staked uint u0)
-(define-data-var current-reward-rate uint u20) ;; APR Percentage
-(define-constant REWARD-DIVISOR u31536000) ;; Seconds in a year (for APR)
+(define-data-var reward-rate uint u2000) ;; 20% APR
+(define-data-var reward-pool uint u0)
 
-;; --- CONSTRAINT CONSTANTS ---
-(define-constant MAX-UINT u340282366920938463463374607431768211455) ;; 2^128 - 1
-(define-constant MIN-STAKE-AMOUNT u1) ;; Minimum 1 token to stake
-(define-constant MAX-REWARD-RATE u10000) ;; Max 100% APR (stored as basis points)
-(define-constant MIN-REWARD-RATE u0) ;; Min 0% APR
-(define-constant MAX-USERS u100000) ;; Maximum tracked users
-
-;; --- MAPS ---
-(define-map UserInfo principal {
-    staked-amount: uint,
-    last-update: uint,
-    pending-rewards: uint
+;; --- USER MAP ---
+(define-map users principal {
+  amount: uint,
+  reward-debt: uint,
+  last-update: uint
 })
 
-;; --- COMPREHENSIVE ERROR CODES ---
-;; Status & Access Errors (100-109)
-(define-constant ERR-PAUSED (err u100))
-(define-constant ERR-NOT-OWNER (err u101))
-(define-constant ERR-NOT-AUTHORIZED (err u102))
-(define-constant ERR-INVALID-PRINCIPAL (err u103))
-(define-constant ERR-CANNOT-PAUSE (err u104))
+;; ================================
+;; PRIVATE FUNCTIONS
+;; ================================
 
-;; Amount Validation Errors (110-119)
-(define-constant ERR-INSUFFICIENT-FUNDS (err u110))
-(define-constant ERR-ZERO-AMOUNT (err u111))
-(define-constant ERR-AMOUNT-TOO-SMALL (err u112))
-(define-constant ERR-AMOUNT-TOO-LARGE (err u113))
-(define-constant ERR-INVALID-AMOUNT (err u114))
-
-;; Overflow & Math Errors (120-129)
-(define-constant ERR-OVERFLOW (err u120))
-(define-constant ERR-UNDERFLOW (err u121))
-(define-constant ERR-MATH-PRECISION (err u122))
-(define-constant ERR-DIVISION-BY-ZERO (err u123))
-
-;; State & Rate Errors (130-139)
-(define-constant ERR-INVALID-RATE (err u130))
-(define-constant ERR-RATE-TOO-HIGH (err u131))
-(define-constant ERR-RATE-NOT-SET (err u132))
-(define-constant ERR-NO-STAKE (err u133))
-(define-constant ERR-ZERO-REWARDS (err u134))
-
-;; Token & Transfer Errors (140-149)
-(define-constant ERR-TOKEN-TRANSFER-FAILED (err u140))
-(define-constant ERR-TOKEN-NOT-AVAILABLE (err u141))
-(define-constant ERR-TOKEN-BALANCE-MISMATCH (err u142))
-(define-constant ERR-TRANSFER-AMOUNT-MISMATCH (err u143))
-
-;; Contract State Errors (150-159)
-(define-constant ERR-TOTAL-STAKED-MISMATCH (err u150))
-(define-constant ERR-CONTRACT-LOCKED (err u151))
-(define-constant ERR-USER-NOT-FOUND (err u152))
-(define-constant ERR-INVALID-TIMESTAMP (err u153))
-
-;; --- PRIVATE VALIDATION FUNCTIONS ---
-
-;; Check if amount is within valid range
-(define-private (is-valid-amount (amount uint))
-    (and
-        (> amount u0)
-        (<= amount MAX-UINT)
-    )
+(define-private (only-owner)
+  (begin
+    (asserts! (is-eq tx-sender (var-get owner)) ERR-NOT-OWNER)
+    (ok true)
+  )
 )
 
-;; Check if amount is safe for staking (not too small, not zero)
-(define-private (is-stake-amount-valid (amount uint))
-    (and
-        (>= amount MIN-STAKE-AMOUNT)
-        (<= amount MAX-UINT)
-    )
+(define-private (not-paused)
+  (begin
+    (asserts! (not (var-get paused)) ERR-PAUSED)
+    (ok true)
+  )
 )
 
-;; Check for uint overflow when adding
-(define-private (will-overflow-add (a uint) (b uint))
-    (> (+ a b) MAX-UINT)
-)
-
-;; Check for safe addition (no overflow)
-(define-private (safe-add (a uint) (b uint))
-    (if (will-overflow-add a b)
-        (err u120) ;; ERR-OVERFLOW
-        (ok (+ a b))
-    )
-)
-
-;; Check for safe subtraction (no underflow)
-(define-private (safe-sub (a uint) (b uint))
-    (if (< a b)
-        (err u121) ;; ERR-UNDERFLOW
-        (ok (- a b))
-    )
-)
-
-;; Validate reward rate is within acceptable range
-(define-private (is-rate-valid (rate uint))
-    (and
-        (>= rate MIN-REWARD-RATE)
-        (<= rate MAX-REWARD-RATE)
-    )
-)
-
-;; Check principal is valid (not null)
-(define-private (is-principal-valid (principal principal))
-    (not (is-eq principal 'SZ2J6ZY48GV1EZ5V2V5RB9MP9DRQGCDM847VI54W))
-)
-
-;; --- PRIVATE FUNCTIONS ---
-
-;; Calculate rewards earned since the last interaction with overflow protection
-(define-private (calculate-rewards (user principal))
+(define-private (calculate-reward (amount uint) (last uint))
+  (let (
+    (time (- stacks-block-time last))
+  )
+    ;; (match (*? amount (var-get reward-rate))
+    ;;   rate-product
+    ;;     (match (*? rate-product time)
+    ;;       time-product
+    ;;         (/ time-product (* YEAR BASIS_POINTS))
+    ;;       u0)
+    ;;   u0)
     (let (
-        (data (default-to {staked-amount: u0, last-update: stacks-block-time, pending-rewards: u0} (map-get? UserInfo user)))
-        (time-elapsed (if (>= stacks-block-time (get last-update data)) 
-                          (- stacks-block-time (get last-update data))
-                          u0))
-        ;; Reward = (Amount * Rate * Time) / (100 * SecondsInYear)
-        ;; Apply overflow checks at each multiplication step
-        (rate-product (if (<= (get staked-amount data) MAX-UINT)
-                         (* (get staked-amount data) (var-get current-reward-rate))
-                         u0))
-        (time-product (if (<= rate-product MAX-UINT)
-                         (* rate-product time-elapsed)
-                         u0))
-        (earned (if (> (* u100 REWARD-DIVISOR) u0)
-                   (/ time-product (* u100 REWARD-DIVISOR))
-                   u0))
+      (rate-product (* amount (var-get reward-rate)))
+      (time-product (* rate-product time))
     )
-        earned
+      (/ time-product (* YEAR BASIS_POINTS))
     )
+  )
 )
 
-;; --- PUBLIC FUNCTIONS ---
+(define-private (update-user (user principal))
+  (let (
+    (data (default-to {amount: u0, reward-debt: u0, last-update: stacks-block-time}
+                      (map-get? users user)))
+    (reward (calculate-reward (get amount data) (get last-update data)))
+  )
+    (map-set users user {
+      amount: (get amount data),
+      reward-debt: (+ (get reward-debt data) reward),
+      last-update: stacks-block-time
+    })
+  )
+)
 
-(define-public (stake (token <ft-trait>) (amount uint))
+;; ================================
+;; PUBLIC FUNCTIONS
+;; ================================
+
+;; --- STAKE ---
+(define-public (stake (amount uint))
+  (begin
+    (try! (not-paused))
+
+    (asserts! (> amount u0) ERR-INVALID-AMOUNT)
+
+    (update-user tx-sender)
+
     (let (
-        (user tx-sender)
-        (earned (calculate-rewards user))
-        (data (default-to {staked-amount: u0, last-update: stacks-block-time, pending-rewards: u0} (map-get? UserInfo user)))
+      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
     )
-        ;; Check contract is not paused
-        (asserts! (not (var-get is-paused)) ERR-PAUSED)
-        
-        ;; Validate amount is not zero
-        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
-        
-        ;; Validate amount is valid stake amount
-        (asserts! (is-stake-amount-valid amount) ERR-AMOUNT-TOO-LARGE)
-        
-        ;; Check for overflow when adding to existing stake
-        (asserts! (not (will-overflow-add (get staked-amount data) amount)) ERR-OVERFLOW)
-        
-        ;; Check for overflow when adding to total staked
-        (asserts! (not (will-overflow-add (var-get total-staked) amount)) ERR-OVERFLOW)
-        
-        ;; Transfer tokens from user to contract
-        (try! (contract-call? token transfer amount user (as-contract) none))
-        
-        ;; Update user stake with earned rewards
-        (map-set UserInfo user {
-            staked-amount: (+ (get staked-amount data) amount),
-            last-update: stacks-block-time,
-            pending-rewards: (+ (get pending-rewards data) earned)
-        })
-        
-        ;; Update total staked
-        (var-set total-staked (+ (var-get total-staked) amount))
-        (ok true)
+      (try! (stx-transfer? amount tx-sender contract-caller))
+
+      (map-set users tx-sender {
+        amount: (+ (get amount data) amount),
+        reward-debt: (get reward-debt data),
+        last-update: stacks-block-time
+      })
+
+      (var-set total-staked (+ (var-get total-staked) amount))
+      (ok true)
     )
+  )
 )
 
-(define-public (unstake (token <ft-trait>) (amount uint))
+;; --- UNSTAKE ---
+(define-public (unstake (amount uint))
+  (begin
+    (try! (not-paused))
+
+    (asserts! (> amount u0) ERR-INVALID-AMOUNT)
+
+    (update-user tx-sender)
+
     (let (
-        (user tx-sender)
-        (earned (calculate-rewards user))
-        (data (default-to {staked-amount: u0, last-update: stacks-block-time, pending-rewards: u0} (map-get? UserInfo user)))
-        (new-staked (if (>= (get staked-amount data) amount) 
-                       (- (get staked-amount data) amount)
-                       u0))
+      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
     )
-        ;; Check contract is not paused
-        (asserts! (not (var-get is-paused)) ERR-PAUSED)
-        
-        ;; Validate amount is not zero
-        (asserts! (> amount u0) ERR-ZERO-AMOUNT)
-        
-        ;; Validate amount is valid
-        (asserts! (is-valid-amount amount) ERR-INVALID-AMOUNT)
-        
-        ;; Check user has stake
-        (asserts! (> (get staked-amount data) u0) ERR-NO-STAKE)
-        
-        ;; Check user has sufficient staked amount
-        (asserts! (>= (get staked-amount data) amount) ERR-INSUFFICIENT-FUNDS)
-        
-        ;; Transfer tokens back to user (contract -> user)
-        (try! (contract-call? token transfer amount (as-contract) user none))
+      (asserts! (>= (get amount data) amount) ERR-INSUFFICIENT-FUNDS)
 
-        ;; Update user stake
-        (map-set UserInfo user {
-            staked-amount: new-staked,
-            last-update: stacks-block-time,
-            pending-rewards: (+ (get pending-rewards data) earned)
-        })
+      (try! (stx-transfer? amount tx-sender contract-caller))
 
-        ;; Update total staked
-        (var-set total-staked (- (var-get total-staked) amount))
-        (ok true)
+      (map-set users tx-sender {
+        amount: (- (get amount data) amount),
+        reward-debt: (get reward-debt data),
+        last-update: stacks-block-time
+      })
+
+      (var-set total-staked (- (var-get total-staked) amount))
+      (ok true)
     )
+  )
 )
 
-;; Claim Rewards Function with comprehensive error handling
-(define-public (claim-rewards (token <ft-trait>))
+;; --- CLAIM REWARDS ---
+(define-public (claim)
+  (begin
+    (try! (not-paused))
+
+    (update-user tx-sender)
+
     (let (
-        (user tx-sender)
-        (earned (calculate-rewards user))
-        (data (default-to {staked-amount: u0, last-update: stacks-block-time, pending-rewards: u0} (map-get? UserInfo user)))
-        (total-to-claim (+ (get pending-rewards data) earned))
+      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
+      (reward (get reward-debt data))
     )
-        ;; Check contract is not paused
-        (asserts! (not (var-get is-paused)) ERR-PAUSED)
-        
-        ;; Check user exists with stakes or rewards
-        (asserts! (or (> (get staked-amount data) u0) (> (get pending-rewards data) u0)) ERR-NO-STAKE)
+      (asserts! (> reward u0) ERR-NO-REWARDS)
+      (asserts! (>= (var-get reward-pool) reward) ERR-INSUFFICIENT-FUNDS)
 
-        ;; Check if there's actually anything to claim
-        (asserts! (> total-to-claim u0) ERR-ZERO-REWARDS)
-        
-        ;; Validate total-to-claim amount
-        (asserts! (is-valid-amount total-to-claim) ERR-INVALID-AMOUNT)
+      (try! (stx-transfer? reward tx-sender contract-caller))
 
-        ;; Transfer rewards to user
-        (try! (contract-call? token transfer total-to-claim (as-contract) user none))
+      (map-set users tx-sender {
+        amount: (get amount data),
+        reward-debt: u0,
+        last-update: stacks-block-time
+      })
 
-        ;; Reset the user's pending rewards and update timestamp
-        (map-set UserInfo user (merge data {
-            last-update: stacks-block-time,
-            pending-rewards: u0
-        }))
-
-        (ok total-to-claim)
+      (var-set reward-pool (- (var-get reward-pool) reward))
+      (ok reward)
     )
+  )
 )
 
-;; --- ADMIN FUNCTIONS ---
+;; ================================
+;; ADMIN FUNCTIONS
+;; ================================
 
-;; Set contract pause status
-(define-public (set-paused (status bool))
-    (begin
-        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-OWNER)
-        (ok (var-set is-paused status))
-    )
+;; fund reward pool
+(define-public (fund (amount uint))
+  (begin
+    (try! (only-owner))
+    (try! (stx-transfer? amount tx-sender contract-caller))
+    (var-set reward-pool (+ (var-get reward-pool) amount))
+    (ok true)
+  )
 )
 
-;; Set reward rate with validation
-(define-public (set-reward-rate (new-rate uint))
-    (begin
-        ;; Check caller is owner
-        (asserts! (is-eq tx-sender (var-get contract-owner)) ERR-NOT-OWNER)
-        
-        ;; Validate new rate is within acceptable range
-        (asserts! (is-rate-valid new-rate) ERR-RATE-TOO-HIGH)
-        
-        ;; Set the new rate
-        (var-set current-reward-rate new-rate)
-        (ok true)
-    )
+;; set APR
+(define-public (set-rate (rate uint))
+  (begin
+    (try! (only-owner))
+    (asserts! (<= rate u10000) ERR-INVALID-AMOUNT)
+    (var-set reward-rate rate)
+    (ok true)
+  )
 )
 
-;; Get user staking information
-(define-public (get-user-info (user principal))
-    (ok (map-get? UserInfo user))
+;; pause/unpause
+(define-public (set-paused (state bool))
+  (begin
+    (try! (only-owner))
+    (var-set paused state)
+    (ok true)
+  )
 )
 
-;; Get total staked amount
-(define-public (get-total-staked)
-    (ok (var-get total-staked))
+;; ================================
+;; READ FUNCTIONS
+;; ================================
+
+(define-read-only (get-user (user principal))
+  (map-get? users user)
 )
 
-;; Get current reward rate
-(define-public (get-reward-rate)
-    (ok (var-get current-reward-rate))
+(define-read-only (get-total-staked)
+  (var-get total-staked)
 )
 
-;; Check if contract is paused
-(define-public (is-contract-paused)
-    (ok (var-get is-paused))
+(define-read-only (get-reward-pool)
+  (var-get reward-pool)
 )
