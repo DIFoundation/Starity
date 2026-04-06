@@ -41,7 +41,7 @@ describe("Stake Function - Basic Operations", () => {
     const block = simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${stakeAmount}`],
+      [`u${stakeAmount}`],
       wallet1
     );
     expect(block.result).toBeOk(true);
