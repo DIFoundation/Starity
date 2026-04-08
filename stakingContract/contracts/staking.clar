@@ -48,15 +48,8 @@
 
 (define-private (calculate-reward (amount uint) (last uint))
   (let (
-    (time (- stacks-block-time last))
+    (time (- block-burn-time last)) ;; Fix 1
   )
-    ;; (match (*? amount (var-get reward-rate))
-    ;;   rate-product
-    ;;     (match (*? rate-product time)
-    ;;       time-product
-    ;;         (/ time-product (* YEAR BASIS_POINTS))
-    ;;       u0)
-    ;;   u0)
     (let (
       (rate-product (* amount (var-get reward-rate)))
       (time-product (* rate-product time))
@@ -68,14 +61,14 @@
 
 (define-private (update-user (user principal))
   (let (
-    (data (default-to {amount: u0, reward-debt: u0, last-update: stacks-block-time}
+    (data (default-to {amount: u0, reward-debt: u0, last-update: block-burn-time} ;; Fix 2
                       (map-get? users user)))
     (reward (calculate-reward (get amount data) (get last-update data)))
   )
     (map-set users user {
       amount: (get amount data),
       reward-debt: (+ (get reward-debt data) reward),
-      last-update: stacks-block-time
+      last-update: block-burn-time ;; Fix 3
     })
   )
 )
@@ -88,21 +81,26 @@
 (define-public (stake (amount uint))
   (begin
     (try! (not-paused))
-
     (asserts! (> amount u0) ERR-INVALID-AMOUNT)
-
+    
     (update-user tx-sender)
 
-    (let (
-      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
-    )
-      (try! (stx-transfer? amount tx-sender contract-caller))
 
-      (map-set users tx-sender {
-        amount: (+ (get amount data) amount),
-        reward-debt: (get reward-debt data),
-        last-update: stacks-block-time
-      })
+    (let (
+    ;; ... Inside stake function let block
+(data (default-to {amount: u0, reward-debt: u0, last-update: block-burn-time} ;; Fix 4
+                  (map-get? users tx-sender)))
+
+      (contract-address (as-contract tx-sender)) 
+    )
+      ;; Now use the variable
+      (try! (stx-transfer? amount tx-sender contract-address))
+
+(map-set users tx-sender {
+  amount: (+ (get amount data) amount),
+  reward-debt: (get reward-debt data),
+  last-update: block-burn-time ;; Fix 5
+})
 
       (var-set total-staked (+ (var-get total-staked) amount))
       (ok true)
@@ -111,27 +109,52 @@
 )
 
 ;; --- UNSTAKE ---
+;; (define-public (unstake (amount uint))
+;;   (begin
+;;     (try! (not-paused))
+
+;;     (asserts! (> amount u0) ERR-INVALID-AMOUNT)
+
+;;     (update-user tx-sender)
+
+;;     (let (
+;;       (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
+;;     )
+;;       (asserts! (>= (get amount data) amount) ERR-INSUFFICIENT-FUNDS)
+
+;;       (try! (as-contract (stx-transfer? amount tx-sender tx-sender)))
+
+;;       (map-set users tx-sender {
+;;         amount: (- (get amount data) amount),
+;;         reward-debt: (get reward-debt data),
+;;         last-update: stacks-block-time
+;;       })
+
+;;       (var-set total-staked (- (var-get total-staked) amount))
+;;       (ok true)
+;;     )
+;;   )
+;; )
 (define-public (unstake (amount uint))
   (begin
     (try! (not-paused))
-
     (asserts! (> amount u0) ERR-INVALID-AMOUNT)
-
     (update-user tx-sender)
 
     (let (
-      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
+      (user tx-sender) ;; Capture the user's principal here!
+      (data (unwrap! (map-get? users user) ERR-NO-STAKE))
     )
       (asserts! (>= (get amount data) amount) ERR-INSUFFICIENT-FUNDS)
 
-      (try! (stx-transfer? amount tx-sender contract-caller))
+      ;; Now: From Contract (tx-sender) to User (user)
+      (try! (as-contract (stx-transfer? amount tx-sender user)))
 
-      (map-set users tx-sender {
+      (map-set users user {
         amount: (- (get amount data) amount),
         reward-debt: (get reward-debt data),
         last-update: stacks-block-time
       })
-
       (var-set total-staked (- (var-get total-staked) amount))
       (ok true)
     )
@@ -139,27 +162,52 @@
 )
 
 ;; --- CLAIM REWARDS ---
+;; (define-public (claim)
+;;   (begin
+;;     (try! (not-paused))
+
+;;     (update-user tx-sender)
+
+;;     (let (
+;;       (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
+;;       (reward (get reward-debt data))
+;;     )
+;;       (asserts! (> reward u0) ERR-NO-REWARDS)
+;;       (asserts! (>= (var-get reward-pool) reward) ERR-INSUFFICIENT-FUNDS)
+
+;;       (try! (as-contract (stx-transfer? reward tx-sender tx-sender)))
+
+;;       (map-set users tx-sender {
+;;         amount: (get amount data),
+;;         reward-debt: u0,
+;;         last-update: stacks-block-time
+;;       })
+
+;;       (var-set reward-pool (- (var-get reward-pool) reward))
+;;       (ok reward)
+;;     )
+;;   )
+;; )
 (define-public (claim)
   (begin
     (try! (not-paused))
-
     (update-user tx-sender)
-
     (let (
-      (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
+      (user tx-sender) ;; Capture user
+      (data (unwrap! (map-get? users user) ERR-NO-STAKE))
       (reward (get reward-debt data))
     )
       (asserts! (> reward u0) ERR-NO-REWARDS)
       (asserts! (>= (var-get reward-pool) reward) ERR-INSUFFICIENT-FUNDS)
 
-      (try! (stx-transfer? reward tx-sender contract-caller))
+      ;; Transfer from Contract to User
+      (try! (as-contract (stx-transfer? reward tx-sender user)))
 
-      (map-set users tx-sender {
+      (map-set users user {
         amount: (get amount data),
         reward-debt: u0,
         last-update: stacks-block-time
       })
-
       (var-set reward-pool (- (var-get reward-pool) reward))
       (ok reward)
     )
@@ -174,7 +222,7 @@
 (define-public (fund (amount uint))
   (begin
     (try! (only-owner))
-    (try! (stx-transfer? amount tx-sender contract-caller))
+    (try! (stx-transfer? amount tx-sender (as-contract tx-sender)))
     (var-set reward-pool (+ (var-get reward-pool) amount))
     (ok true)
   )
