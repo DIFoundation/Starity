@@ -96,7 +96,7 @@
     (let (
       (data (unwrap! (map-get? users tx-sender) ERR-NO-STAKE))
     )
-      (try! (stx-transfer? amount tx-sender contract-caller))
+      (try! (stx-transfer? amount tx-sender current-contract))
 
       (map-set users tx-sender {
         amount: (+ (get amount data) amount),
@@ -124,7 +124,7 @@
     )
       (asserts! (>= (get amount data) amount) ERR-INSUFFICIENT-FUNDS)
 
-      (try! (stx-transfer? amount tx-sender contract-caller))
+      (try! (stx-transfer? amount current-contract tx-sender))
 
       (map-set users tx-sender {
         amount: (- (get amount data) amount),
@@ -152,7 +152,7 @@
       (asserts! (> reward u0) ERR-NO-REWARDS)
       (asserts! (>= (var-get reward-pool) reward) ERR-INSUFFICIENT-FUNDS)
 
-      (try! (stx-transfer? reward tx-sender contract-caller))
+      (try! (stx-transfer? reward current-contract tx-sender))
 
       (map-set users tx-sender {
         amount: (get amount data),
@@ -175,7 +175,7 @@
   (begin
     (try! (only-owner))
     (asserts! (> amount u0) ERR-INVALID-AMOUNT)
-    (try! (stx-transfer? amount tx-sender contract-caller))
+    (try! (stx-transfer? amount tx-sender current-contract))
     (var-set reward-pool (+ (var-get reward-pool) amount))
     (ok true)
   )
