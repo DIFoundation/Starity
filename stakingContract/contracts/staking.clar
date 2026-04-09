@@ -49,20 +49,10 @@
 (define-private (calculate-reward (amount uint) (last uint))
   (let (
     (time (- stacks-block-time last))
+    (rate-product (* amount (var-get reward-rate)))
+    (time-product (* rate-product time))
   )
-    ;; (match (*? amount (var-get reward-rate))
-    ;;   rate-product
-    ;;     (match (*? rate-product time)
-    ;;       time-product
-    ;;         (/ time-product (* YEAR BASIS_POINTS))
-    ;;       u0)
-    ;;   u0)
-    (let (
-      (rate-product (* amount (var-get reward-rate)))
-      (time-product (* rate-product time))
-    )
-      (/ time-product (* YEAR BASIS_POINTS))
-    )
+    (/ time-product (* YEAR BASIS_POINTS))
   )
 )
 

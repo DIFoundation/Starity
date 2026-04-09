@@ -9,10 +9,24 @@ const deployer = accounts.get("deployer")!;
 // ======= TEST HELPERS =======
 // Helper to get contract state
 const getContractState = () => {
-  const isPaused = simnet.callReadOnlyFn("staking", "get-is-paused", [], deployer).result;
   const totalStaked = simnet.callReadOnlyFn("staking", "get-total-staked", [], deployer).result;
-  const rewardRate = simnet.callReadOnlyFn("staking", "get-reward-rate", [], deployer).result;
-  return { isPaused, totalStaked, rewardRate };
+  const rewardPool = simnet.callReadOnlyFn("staking", "get-reward-pool", [], deployer).result;
+  return { totalStaked, rewardPool };
+};
+
+// Helper to get user data
+const getUserData = (user: string) => {
+  return simnet.callReadOnlyFn("staking", "get-user", [user], deployer).result;
+};
+
+// Helper to fund reward pool
+const fundRewardPool = (amount: number) => {
+  return simnet.callPublicFn("staking", "fund", [`u${amount}`], deployer);
+};
+
+// Helper to set paused state
+const setPaused = (paused: boolean) => {
+  return simnet.callPublicFn("staking", "set-paused", [paused], deployer);
 };
 
 // ======= SETUP & INITIALIZATION TESTS =======
@@ -23,9 +37,8 @@ describe("Staking Contract - Setup and Initialization", () => {
 
   it("contract initializes with default state", () => {
     const state = getContractState();
-    expect(state.isPaused).toBeDefined();
-    expect(state.totalStaked).toBeDefined();
-    expect(state.rewardRate).toBeDefined();
+    expect(state.totalStaked).toBeUint(0);
+    expect(state.rewardPool).toBeUint(0);
   });
 
   it("total-staked starts at zero", () => {
@@ -52,7 +65,7 @@ describe("Stake Function - Basic Operations", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${stakeAmount}`],
+      [`u${stakeAmount}`],
       wallet1
     );
     
@@ -67,19 +80,37 @@ describe("Stake Function - Basic Operations", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${amount1}`],
+      [`u${amount1}`],
       wallet2
     );
     
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${amount2}`],
+      [`u${amount2}`],
       wallet2
     );
     
     const state = getContractState();
     expect(state.totalStaked).toBeUint(amount1 + amount2);
+  });
+
+  it("staking updates user data", () => {
+    const stakeAmount = 1000;
+    simnet.callPublicFn(
+      "staking",
+      "stake",
+      [`u${stakeAmount}`],
+      wallet1
+    );
+    
+    const userData = getUserData(wallet1);
+    expect(userData).toBeSome();
+    if (userData.type === "some") {
+      const data = userData.value as any;
+      expect(data.amount).toBeUint(stakeAmount);
+      expect(data["reward-debt"]).toBeUint(0);
+    }
   });
 });
 
@@ -87,15 +118,15 @@ describe("Stake Function - Basic Operations", () => {
 describe("Stake Function - Edge Cases and Errors", () => {
   it("contract rejects staking when paused", () => {
     // Set paused to true
-    simnet.callPublicFn("staking", "set-paused", ["true"], deployer);
+    setPaused(true);
     
     const result = simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
-    expect(result.result).toBeErr();
+    expect(result.result).toBeErr(101);
   });
 
   it("multiple users can stake independently", () => {
@@ -104,14 +135,14 @@ describe("Stake Function - Edge Cases and Errors", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${amount}`],
+      [`u${amount}`],
       wallet1
     );
     
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${amount}`],
+      [`u${amount}`],
       wallet2
     );
     
@@ -119,13 +150,14 @@ describe("Stake Function - Edge Cases and Errors", () => {
     expect(state.totalStaked).toBeUint(amount * 2);
   });
 
-  it("zero amount stake is rejected or handled", () => {
-    simnet.callPublicFn(
+  it("zero amount stake is rejected", () => {
+    const result = simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u0"],
+      ["u0"],
       wallet1
     );
+    expect(result.result).toBeErr(102);
     const state = getContractState();
     expect(state.totalStaked).toBeUint(0);
   });
@@ -138,7 +170,7 @@ describe("Unstake Function - Basic Operations", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u2000"],
+      ["u2000"],
       wallet1
     );
   });
@@ -148,7 +180,7 @@ describe("Unstake Function - Basic Operations", () => {
     const result = simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${unstakeAmount}`],
+      [`u${unstakeAmount}`],
       wallet1
     );
     expect(result.result).toBeOk(true);
@@ -159,7 +191,7 @@ describe("Unstake Function - Basic Operations", () => {
     simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${unstakeAmount}`],
+      [`u${unstakeAmount}`],
       wallet1
     );
     
@@ -171,10 +203,20 @@ describe("Unstake Function - Basic Operations", () => {
     const result = simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u5000"],
+      ["u5000"],
       wallet1
     );
-    expect(result.result).toBeErr();
+    expect(result.result).toBeErr(104);
+  });
+
+  it("user cannot unstake without having staked", () => {
+    const result = simnet.callPublicFn(
+      "staking",
+      "unstake",
+      ["u100"],
+      wallet2
+    );
+    expect(result.result).toBeErr(103);
   });
 });
 
@@ -185,14 +227,14 @@ describe("Unstake Function - Advanced Scenarios", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
     
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u3000"],
+      ["u3000"],
       wallet2
     );
   });
@@ -201,7 +243,7 @@ describe("Unstake Function - Advanced Scenarios", () => {
     simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u500"],
+      ["u500"],
       wallet1
     );
     
@@ -213,7 +255,7 @@ describe("Unstake Function - Advanced Scenarios", () => {
     const result = simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
     expect(result.result).toBeOk(true);
@@ -223,28 +265,31 @@ describe("Unstake Function - Advanced Scenarios", () => {
   });
 
   it("cannot unstake when contract is paused", () => {
-    simnet.callPublicFn("staking", "set-paused", ["true"], deployer);
+    setPaused(true);
     
     const result = simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u100"],
+      ["u100"],
       wallet1
     );
-    expect(result.result).toBeErr();
+    expect(result.result).toBeErr(101);
   });
 });
 
 // ======= CLAIM REWARDS - BASIC OPERATIONS =======
 describe("Claim Rewards Function - Basic Operations", () => {
   beforeEach(() => {
-    // Setup: stake tokens and advance time
+    // Setup: stake tokens and fund reward pool
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
+    
+    // Fund reward pool
+    fundRewardPool(10000);
     
     // Advance blocks to accumulate rewards
     simnet.mineEmptyBlock();
@@ -254,44 +299,63 @@ describe("Claim Rewards Function - Basic Operations", () => {
   it("user can claim rewards after staking", () => {
     const result = simnet.callPublicFn(
       "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      "claim",
+      [],
       wallet1
     );
-    expect(result.result).toBeDefined();
+    expect(result.result).toBeOk(true);
   });
 
-  it("claiming rewards returns a value", () => {
+  it("claiming rewards returns the amount", () => {
     const result = simnet.callPublicFn(
       "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      "claim",
+      [],
       wallet1
     );
-    expect(result.result).toBeDefined();
+    expect(result.result).toBeOk(true);
+    if (result.result.type === "ok") {
+      expect(result.result.value).toBeUint(expect.any(Number));
+    }
   });
 
-  it("user without rewards cannot claim", () => {
+  it("user without staking cannot claim", () => {
     const result = simnet.callPublicFn(
       "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      "claim",
+      [],
       wallet3
     );
-    expect(result.result).toBeErr();
+    expect(result.result).toBeErr(103);
+  });
+
+  it("user with no rewards cannot claim", () => {
+    // Claim all rewards first
+    simnet.callPublicFn("staking", "claim", [], wallet1);
+    
+    // Try to claim again immediately
+    const result = simnet.callPublicFn(
+      "staking",
+      "claim",
+      [],
+      wallet1
+    );
+    expect(result.result).toBeErr(105);
   });
 });
 
 // ======= CLAIM REWARDS - ACCUMULATION =======
 describe("Claim Rewards Function - Reward Accumulation", () => {
   beforeEach(() => {
-    // Setup: stake with enough time for rewards
+    // Setup: stake and fund reward pool
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
+    
+    fundRewardPool(10000);
     
     // Advance time to accumulate rewards
     for (let i = 0; i < 10; i++) {
@@ -300,61 +364,36 @@ describe("Claim Rewards Function - Reward Accumulation", () => {
   });
 
   it("rewards accumulate over time", () => {
-    // Claim rewards and store the value
-    const result1 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet2
-    );
+    // Stake with wallet2 too
+    simnet.callPublicFn("staking", "stake", ["u1000"], wallet2);
+    
+    // Claim rewards for wallet1
+    const result1 = simnet.callPublicFn("staking", "claim", [], wallet1);
+    expect(result1.result).toBeOk(true);
     
     // Mine more blocks
     for (let i = 0; i < 10; i++) {
       simnet.mineEmptyBlock();
     }
     
-    const result2 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet2
-    );
-    
-    // Both should be ok or both should error - testing consistency
-    expect(result1.result).toBeDefined();
-    expect(result2.result).toBeDefined();
+    // Claim again - should have more rewards
+    const result2 = simnet.callPublicFn("staking", "claim", [], wallet1);
+    expect(result2.result).toBeOk(true);
   });
 
   it("claiming resets pending rewards", () => {
     // Claim rewards
-    const result1 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet1
-    );
-    expect(result1.result).toBeDefined();
+    const result1 = simnet.callPublicFn("staking", "claim", [], wallet1);
+    expect(result1.result).toBeOk(true);
     
     // Immediately claim again (should have no new rewards yet)
-    const result2 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet1
-    );
-    
-    // Second claim might fail if no rewards available
-    expect(result2.result).toBeDefined();
+    const result2 = simnet.callPublicFn("staking", "claim", [], wallet1);
+    expect(result2.result).toBeErr(105);
   });
 
   it("multiple users can claim independently", () => {
     // Stake with wallet2
-    simnet.callPublicFn(
-      "staking",
-      "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u500"],
-      wallet2
-    );
+    simnet.callPublicFn("staking", "stake", ["u500"], wallet2);
     
     // Advance time
     for (let i = 0; i < 5; i++) {
@@ -362,33 +401,25 @@ describe("Claim Rewards Function - Reward Accumulation", () => {
     }
     
     // Both claim
-    const result1 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet1
-    );
+    const result1 = simnet.callPublicFn("staking", "claim", [], wallet1);
+    const result2 = simnet.callPublicFn("staking", "claim", [], wallet2);
     
-    const result2 = simnet.callPublicFn(
-      "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
-      wallet2
-    );
-    
-    expect(result1.result).toBeDefined();
-    expect(result2.result).toBeDefined();
+    expect(result1.result).toBeOk(true);
+    expect(result2.result).toBeOk(true);
   });
 });
 
 // ======= INTEGRATION TESTS =======
 describe("Stake, Unstake, and Claim Integration Tests", () => {
   it("user can stake, earn rewards, and unstake", () => {
+    // Fund reward pool first
+    fundRewardPool(10000);
+    
     // Stake
     const stake = simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
     expect(stake.result).toBeOk(true);
@@ -401,17 +432,17 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     // Claim rewards
     const claim = simnet.callPublicFn(
       "staking",
-      "claim-rewards",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token"],
+      "claim",
+      [],
       wallet1
     );
-    expect(claim.result).toBeDefined();
+    expect(claim.result).toBeOk(true);
     
     // Unstake
     const unstake = simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u1000"],
+      ["u1000"],
       wallet1
     );
     expect(unstake.result).toBeOk(true);
@@ -424,7 +455,7 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${stakeAmount1}`],
+      [`u${stakeAmount1}`],
       wallet1
     );
     
@@ -434,7 +465,7 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     simnet.callPublicFn(
       "staking",
       "stake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", `u${stakeAmount2}`],
+      [`u${stakeAmount2}`],
       wallet2
     );
     
@@ -444,11 +475,66 @@ describe("Stake, Unstake, and Claim Integration Tests", () => {
     simnet.callPublicFn(
       "staking",
       "unstake",
-      ["'SP3FBR2AGK5H9QBDH3EEN6DF8EK8JY7RX8QJ5SVTE.staking-token", "u250"],
+      ["u250"],
       wallet2
     );
     
     state = getContractState();
     expect(state.totalStaked).toBeUint(stakeAmount1 + stakeAmount2 - 250);
+  });
+});
+
+// ======= ADMIN FUNCTIONS =======
+describe("Admin Functions", () => {
+  it("owner can fund reward pool", () => {
+    const fundAmount = 5000;
+    const result = fundRewardPool(fundAmount);
+    expect(result.result).toBeOk(true);
+    
+    const state = getContractState();
+    expect(state.rewardPool).toBeUint(fundAmount);
+  });
+
+  it("non-owner cannot fund reward pool", () => {
+    const result = simnet.callPublicFn("staking", "fund", ["u1000"], wallet1);
+    expect(result.result).toBeErr(100);
+  });
+
+  it("owner can set reward rate", () => {
+    const result = simnet.callPublicFn("staking", "set-rate", ["u1500"], deployer);
+    expect(result.result).toBeOk(true);
+  });
+
+  it("owner cannot set rate above maximum", () => {
+    const result = simnet.callPublicFn("staking", "set-rate", ["u15000"], deployer);
+    expect(result.result).toBeErr(102);
+  });
+
+  it("non-owner cannot set reward rate", () => {
+    const result = simnet.callPublicFn("staking", "set-rate", ["u1000"], wallet1);
+    expect(result.result).toBeErr(100);
+  });
+
+  it("owner can pause and unpause contract", () => {
+    // Pause
+    const pauseResult = setPaused(true);
+    expect(pauseResult.result).toBeOk(true);
+    
+    // Try to stake while paused
+    const stakeResult = simnet.callPublicFn("staking", "stake", ["u1000"], wallet1);
+    expect(stakeResult.result).toBeErr(101);
+    
+    // Unpause
+    const unpauseResult = setPaused(false);
+    expect(unpauseResult.result).toBeOk(true);
+    
+    // Should be able to stake again
+    const stakeResult2 = simnet.callPublicFn("staking", "stake", ["u1000"], wallet1);
+    expect(stakeResult2.result).toBeOk(true);
+  });
+
+  it("non-owner cannot pause contract", () => {
+    const result = simnet.callPublicFn("staking", "set-paused", [true], wallet1);
+    expect(result.result).toBeErr(100);
   });
 });
